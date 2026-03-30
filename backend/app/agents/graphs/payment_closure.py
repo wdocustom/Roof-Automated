@@ -69,15 +69,28 @@ async def load_payment_context(state: PaymentState) -> dict:
     })
 
     contract_amount = project.get("contract_amount", 0) or 0
-    # Placeholder: in production, query actual payments from Stripe
-    amount_paid = 0.0
+
+    # Sum payments received from event stream
+    from app.agents.events import get_project_events
+    events = await get_project_events(
+        company_id=state["company_id"],
+        project_id=state["project_id"],
+        event_types=["payment_received"],
+    )
+    amount_paid = sum(e.get("data", {}).get("amount", 0) for e in events)
+
+    # Build payment schedule from milestones
+    from app.integrations.stripe.payments import build_payment_schedule
+    milestones = project.get("milestones", [])
+    payment_schedule = build_payment_schedule(contract_amount, milestones) if contract_amount > 0 else []
 
     return {
         "project_status": project.get("status", "unknown"),
         "contract_amount": contract_amount,
         "amount_paid": amount_paid,
-        "amount_due": contract_amount - amount_paid,
+        "amount_due": max(contract_amount - amount_paid, 0),
         "property_address": project.get("property_address", ""),
+        "payment_schedule": payment_schedule,
     }
 
 
@@ -88,10 +101,19 @@ async def determine_payment_action(state: PaymentState) -> dict:
     amount_due = state.get("amount_due", 0)
 
     if trigger_type == EventType.MILESTONE_QC_PASSED.value or trigger_type == EventType.MILESTONE_HUMAN_APPROVED.value:
+        # Find the milestone-specific amount from the payment schedule
+        milestone_name = trigger.get("data", {}).get("milestone", "Progress")
+        schedule = state.get("payment_schedule", [])
+        milestone_amount = amount_due  # Fallback to full remaining
+        for entry in schedule:
+            if entry.get("milestone") == milestone_name:
+                milestone_amount = min(entry.get("amount", amount_due), amount_due)
+                break
+
         return {"current_milestone_payment": {
             "type": "milestone_invoice",
-            "amount": amount_due,  # Simplified: full amount at completion
-            "description": f"Milestone payment: {trigger.get('data', {}).get('milestone', 'Progress')}",
+            "amount": milestone_amount,
+            "description": f"Milestone payment: {milestone_name}",
         }}
 
     elif trigger_type == EventType.JOB_COMPLETED.value:
@@ -164,7 +186,12 @@ async def send_invoice(state: PaymentState) -> dict:
 
 
 async def send_reminder(state: PaymentState) -> dict:
-    """Send payment reminder for overdue invoices."""
+    """Send payment reminder with cadence-based tone escalation.
+
+    Uses the REMINDER_CADENCE schedule from payments.py:
+      Day 1-3: friendly  |  Day 5-7: firm  |  Day 10-14: urgent
+      Day 21: final notice  |  Day 30+: escalate to human
+    """
     amount_due = state.get("amount_due", 0)
     days_overdue = state.get("days_overdue", 0)
     customer_phone = state.get("customer_phone", "")
@@ -172,25 +199,46 @@ async def send_reminder(state: PaymentState) -> dict:
     if not customer_phone or amount_due <= 0:
         return {}
 
-    # Escalate tone based on days overdue
-    if days_overdue <= 3:
-        tone = "friendly"
-        body = (
+    from app.integrations.stripe.payments import get_reminder_tone
+    cadence = get_reminder_tone(days_overdue)
+    tone = cadence["tone"]
+
+    # Escalate to human if beyond SMS cadence
+    if tone == "escalate":
+        events = [{
+            "type": EventType.HUMAN_ESCALATION.value,
+            "data": {
+                "escalation_type": "payment_overdue",
+                "amount_due": amount_due,
+                "days_overdue": days_overdue,
+            },
+            "description": f"Payment ${amount_due:,.2f} is {days_overdue} days overdue — escalated to human",
+        }]
+        return {
+            "events_to_emit": events,
+            "actions": [{"action": "payment_escalated_to_human", "days_overdue": days_overdue}],
+        }
+
+    # Generate tone-appropriate message
+    messages_by_tone = {
+        "friendly": (
             f"Friendly reminder: You have an outstanding balance of ${amount_due:,.2f}. "
             f"Please let us know if you have any questions!"
-        )
-    elif days_overdue <= 7:
-        tone = "firm"
-        body = (
+        ),
+        "firm": (
             f"Payment reminder: ${amount_due:,.2f} is now {days_overdue} days past due. "
             f"Please process payment at your earliest convenience."
-        )
-    else:
-        tone = "urgent"
-        body = (
+        ),
+        "urgent": (
             f"Urgent: Your payment of ${amount_due:,.2f} is {days_overdue} days overdue. "
-            f"Please contact us immediately to arrange payment and avoid further action."
-        )
+            f"Please contact us immediately to arrange payment."
+        ),
+        "final": (
+            f"Final notice: ${amount_due:,.2f} is {days_overdue} days past due. "
+            f"Please contact us today to resolve this balance and avoid further action."
+        ),
+    }
+    body = messages_by_tone.get(tone, messages_by_tone["friendly"])
 
     events = [{
         "type": EventType.PAYMENT_REMINDER_SENT.value,
@@ -251,17 +299,27 @@ async def generate_warranty(state: PaymentState) -> dict:
         messages.append({
             "to": state["customer_phone"],
             "body": (
-                f"Your project is complete and paid in full! 🎉\n\n"
+                f"Your project is complete and paid in full!\n\n"
                 f"Your warranty details have been saved. We'll check in at "
                 f"6 and 12 months to ensure everything is holding up.\n\n"
+                f"If you notice any issues, just text us anytime.\n"
                 f"Thank you for choosing us!"
             ),
         })
 
+    # Schedule follow-up check-ins at 6 and 12 months
+    followups = [
+        {"months": 6, "description": "6-month warranty check-in"},
+        {"months": 12, "description": "12-month warranty check-in"},
+    ]
+
     return {
         "events_to_emit": events,
         "messages_to_send": messages,
-        "actions": [{"action": "warranty_generated"}],
+        "actions": [
+            {"action": "warranty_generated"},
+            {"action": "followups_scheduled", "followups": followups},
+        ],
     }
 
 
