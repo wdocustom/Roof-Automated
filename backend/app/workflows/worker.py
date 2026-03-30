@@ -10,13 +10,23 @@ from temporalio.worker import Worker
 
 from app.core.config import settings
 from app.workflows.client import get_temporal_client
+
+# Phase 1: SMS intake
 from app.workflows.sms_intake import (
     SMSIntakeWorkflow,
     check_consent_status,
     handle_opt_out,
-    send_acknowledgment,
     send_help_response,
     store_inbound_message,
+)
+
+# Phase 2: Agent dispatch
+from app.workflows.agent_dispatch import (
+    AgentDispatchWorkflow,
+    determine_agent,
+    log_agent_action,
+    run_customer_engagement_agent,
+    run_lead_onboarding_agent,
 )
 
 
@@ -27,13 +37,21 @@ async def run_worker() -> None:
     worker = Worker(
         client,
         task_queue=settings.temporal_task_queue,
-        workflows=[SMSIntakeWorkflow],
+        workflows=[
+            SMSIntakeWorkflow,
+            AgentDispatchWorkflow,
+        ],
         activities=[
+            # SMS intake activities
             store_inbound_message,
             check_consent_status,
             handle_opt_out,
             send_help_response,
-            send_acknowledgment,
+            # Agent dispatch activities
+            determine_agent,
+            run_lead_onboarding_agent,
+            run_customer_engagement_agent,
+            log_agent_action,
         ],
     )
 

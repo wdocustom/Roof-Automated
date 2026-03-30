@@ -151,20 +151,30 @@ class SMSIntakeWorkflow:
             if consent.get("status") == "opted_out":
                 return {"status": "blocked_no_consent", "message_id": store_result.get("message_id")}
 
-        # 5. Send acknowledgment
-        await workflow.execute_activity(
-            send_acknowledgment,
-            args=[input.from_phone, input.to_phone, len(input.media_urls) > 0],
-            start_to_close_timeout=timedelta(seconds=10),
+        # 5. Dispatch to LangGraph agent via Agent Dispatch Workflow
+        from app.workflows.agent_dispatch import AgentDispatchInput, AgentDispatchWorkflow
+
+        agent_input = AgentDispatchInput(
+            company_id=company_id,
+            customer_phone=input.from_phone,
+            from_phone=input.to_phone,
+            message_body=input.body,
+            media_urls=[m["url"] for m in input.media_urls],
+            message_id=store_result.get("message_id", ""),
         )
 
-        # 6. Phase 2+: Dispatch to LangGraph agent via another activity
-        # await workflow.execute_activity(run_lead_agent, ...)
+        agent_result = await workflow.execute_child_workflow(
+            AgentDispatchWorkflow.run,
+            agent_input,
+            id=f"agent-dispatch-{input.message_sid}",
+            task_queue=settings.temporal_task_queue,
+        )
 
         return {
             "status": "processed",
             "message_id": store_result.get("message_id"),
             "company_id": company_id,
+            "agent_result": agent_result,
         }
 
 
