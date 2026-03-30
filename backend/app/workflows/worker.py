@@ -29,6 +29,16 @@ from app.workflows.agent_dispatch import (
     run_lead_onboarding_agent,
 )
 
+# Phase 3: Project lifecycle + swarm agents
+from app.workflows.project_lifecycle import (
+    ProjectLifecycleWorkflow,
+    log_lifecycle_event,
+    run_execution_agent,
+    run_orchestrator,
+    run_payment_agent,
+    run_qc_agent,
+)
+
 
 async def run_worker() -> None:
     """Connect to Temporal and start processing workflows."""
@@ -38,20 +48,30 @@ async def run_worker() -> None:
         client,
         task_queue=settings.temporal_task_queue,
         workflows=[
+            # Phase 1
             SMSIntakeWorkflow,
+            # Phase 2
             AgentDispatchWorkflow,
+            # Phase 3
+            ProjectLifecycleWorkflow,
         ],
         activities=[
-            # SMS intake activities
+            # Phase 1: SMS intake
             store_inbound_message,
             check_consent_status,
             handle_opt_out,
             send_help_response,
-            # Agent dispatch activities
+            # Phase 2: Agent dispatch
             determine_agent,
             run_lead_onboarding_agent,
             run_customer_engagement_agent,
             log_agent_action,
+            # Phase 3: Swarm agents
+            run_orchestrator,
+            run_execution_agent,
+            run_qc_agent,
+            run_payment_agent,
+            log_lifecycle_event,
         ],
     )
 
