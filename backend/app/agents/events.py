@@ -63,6 +63,21 @@ class EventType(str, Enum):
     JOB_COMPLETED = "job_completed"
     WARRANTY_GENERATED = "warranty_generated"
 
+    # Change Orders
+    CHANGE_ORDER_REQUESTED = "change_order_requested"
+    CHANGE_ORDER_APPROVED = "change_order_approved"
+    CHANGE_ORDER_REJECTED = "change_order_rejected"
+
+    # Measurements
+    MEASUREMENT_ORDERED = "measurement_ordered"
+    MEASUREMENT_RECEIVED = "measurement_received"
+    DRONE_SURVEY_REQUESTED = "drone_survey_requested"
+    DRONE_SURVEY_COMPLETED = "drone_survey_completed"
+
+    # Supplier
+    PRICE_UPDATE_APPLIED = "price_update_applied"
+    PRICE_UPDATE_FLAGGED = "price_update_flagged"
+
     # System
     HUMAN_ESCALATION = "human_escalation"
     AGENT_ERROR = "agent_error"
