@@ -16,10 +16,9 @@ class Settings(BaseSettings):
     database_url: str = "postgresql+asyncpg://roof_user:password@localhost:5432/roof_automated"
     database_sync_url: str = "postgresql://roof_user:password@localhost:5432/roof_automated"
 
-    # -- Clerk Auth --
-    clerk_secret_key: str = ""
-    clerk_publishable_key: str = ""
-    clerk_jwks_url: str = ""
+    # -- Neon Auth --
+    neon_auth_url: str = ""
+    neon_auth_jwks_url: str = ""
 
     # -- Temporal --
     temporal_host: str = "localhost:7233"
@@ -42,6 +41,7 @@ class Settings(BaseSettings):
     # -- LLM --
     openai_api_key: str = ""
     anthropic_api_key: str = ""
+    gemini_api_key: str = ""
     langchain_tracing_v2: bool = True
     langchain_api_key: str = ""
     langchain_project: str = "roof-automated"

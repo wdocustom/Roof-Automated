@@ -51,6 +51,7 @@ DEFAULT_MODELS: dict[ModelTier, list[str]] = {
         "openai/gpt-4o",
     ],
     ModelTier.VISION: [
+        "gemini/gemini-2.5-pro",
         "openai/gpt-4o",
         "anthropic/claude-sonnet-4-6",
     ],
