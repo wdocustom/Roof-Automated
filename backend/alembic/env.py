@@ -9,7 +9,11 @@ from app.core.config import settings
 from app.models import Base  # noqa: F401 — import all models so metadata is populated
 
 config = context.config
-config.set_main_option("sqlalchemy.url", settings.database_sync_url)
+
+# Neon's connection pooler (-pooler endpoint) uses PgBouncer in transaction mode,
+# which doesn't support advisory locks required by Alembic. Always use direct connection.
+sync_url = settings.database_sync_url.replace("-pooler.", ".")
+config.set_main_option("sqlalchemy.url", sync_url)
 
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
