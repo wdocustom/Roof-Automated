@@ -17,8 +17,6 @@ import pytest
 from app.agents.events import EventType
 from app.integrations.drone.client import (
     DroneService,
-    DroneSurveyRequest,
-    SurveyPriority,
     SurveyStatus,
     should_request_drone_survey,
 )
@@ -28,20 +26,17 @@ from app.integrations.eagleview.client import (
     MeasurementOrderStatus,
     MeasurementService,
     MeasurementSource,
-    PropertyMeasurement,
-    RoofFacet,
     _mock_eagleview_measurement,
 )
 from app.integrations.supplier.price_feed import (
-    PriceUpdate,
     SupplierName,
     SupplierPriceFeed,
 )
 
-
 # ---------------------------------------------------------------------------
 # EagleView / Hover
 # ---------------------------------------------------------------------------
+
 
 class TestEagleViewProvider:
     @pytest.mark.asyncio
@@ -126,6 +121,7 @@ class TestMeasurementService:
 # Drone Survey
 # ---------------------------------------------------------------------------
 
+
 class TestDroneSurvey:
     def test_should_request_for_very_complex_roof(self):
         assert should_request_drone_survey("very_complex", 2000) is True
@@ -179,6 +175,7 @@ class TestDroneSurvey:
 # Supplier Price Feed
 # ---------------------------------------------------------------------------
 
+
 class TestSupplierPriceFeed:
     def test_parse_webhook_update(self):
         feed = SupplierPriceFeed()
@@ -219,6 +216,7 @@ class TestSupplierPriceFeed:
 # Event Types for Phase 4
 # ---------------------------------------------------------------------------
 
+
 class TestPhase4EventTypes:
     def test_change_order_events_exist(self):
         assert EventType.CHANGE_ORDER_REQUESTED.value == "change_order_requested"
@@ -240,6 +238,7 @@ class TestPhase4EventTypes:
 # Preview / Scope
 # ---------------------------------------------------------------------------
 
+
 class TestPreviewScope:
     def test_scope_items_for_roof(self):
         from app.agents.tools.preview import _build_scope_items
@@ -254,7 +253,10 @@ class TestPreviewScope:
         assert any("ridge vent" in i.lower() for i in items)
         assert any("flashing" in i.lower() for i in items)
         assert any("drip edge" in i.lower() for i in items)
-        assert any("debris" in i.lower() or "cleanup" in i.lower() or "clean up" in i.lower() for i in items)
+        assert any(
+            "debris" in i.lower() or "cleanup" in i.lower() or "clean up" in i.lower()
+            for i in items
+        )
 
     def test_scope_items_for_siding(self):
         from app.agents.tools.preview import _build_scope_items
@@ -281,15 +283,18 @@ class TestPreviewScope:
 # Vision QC Summary
 # ---------------------------------------------------------------------------
 
+
 class TestVisionQCSummary:
     @pytest.mark.asyncio
     async def test_qc_summary_no_photos(self):
         from app.agents.tools.vision_qc import generate_qc_summary
 
-        result = await generate_qc_summary.ainvoke({
-            "photo_analyses": [],
-            "milestone_name": "Tear-off Complete",
-        })
+        result = await generate_qc_summary.ainvoke(
+            {
+                "photo_analyses": [],
+                "milestone_name": "Tear-off Complete",
+            }
+        )
         assert result["overall_grade"] == "incomplete"
         assert len(result["issues"]) > 0
 
@@ -306,10 +311,12 @@ class TestVisionQCSummary:
             mock.complete = AsyncMock(
                 return_value=type("R", (), {"content": "Great work on the tear-off."})()
             )
-            result = await generate_qc_summary.ainvoke({
-                "photo_analyses": analyses,
-                "milestone_name": "Tear-off Complete",
-            })
+            result = await generate_qc_summary.ainvoke(
+                {
+                    "photo_analyses": analyses,
+                    "milestone_name": "Tear-off Complete",
+                }
+            )
             assert result["overall_grade"] == "pass"
             assert result["avg_score"] >= 0.8
             assert result["photo_count"] == 2
@@ -319,7 +326,11 @@ class TestVisionQCSummary:
         from app.agents.tools.vision_qc import generate_qc_summary
 
         analyses = [
-            {"spec_match_score": 0.3, "recommendation": "reject", "issues": "Missing flashing at valley"},
+            {
+                "spec_match_score": 0.3,
+                "recommendation": "reject",
+                "issues": "Missing flashing at valley",
+            },
             {"spec_match_score": 0.8, "recommendation": "approve", "issues": "none"},
         ]
 
@@ -327,9 +338,11 @@ class TestVisionQCSummary:
             mock.complete = AsyncMock(
                 return_value=type("R", (), {"content": "Issues found during QC."})()
             )
-            result = await generate_qc_summary.ainvoke({
-                "photo_analyses": analyses,
-                "milestone_name": "Shingles Installed",
-            })
+            result = await generate_qc_summary.ainvoke(
+                {
+                    "photo_analyses": analyses,
+                    "milestone_name": "Shingles Installed",
+                }
+            )
             assert result["overall_grade"] == "fail"
             assert "Missing flashing at valley" in result["issues"]

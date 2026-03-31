@@ -20,10 +20,10 @@ from temporalio import activity, workflow
 
 from app.core.config import settings
 
-
 # ---------------------------------------------------------------------------
 # Data classes for workflow input
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class SMSIntakeInput:
@@ -39,6 +39,7 @@ class SMSIntakeInput:
 # ---------------------------------------------------------------------------
 # Activities — the actual I/O operations
 # ---------------------------------------------------------------------------
+
 
 @activity.defn
 async def store_inbound_message(input: SMSIntakeInput) -> dict:
@@ -107,6 +108,7 @@ async def send_acknowledgment(to_phone: str, from_phone: str, has_media: bool) -
 # Workflow — the durable orchestration
 # ---------------------------------------------------------------------------
 
+
 @workflow.defn
 class SMSIntakeWorkflow:
     """Process an inbound SMS/MMS through the full intake pipeline."""
@@ -149,7 +151,10 @@ class SMSIntakeWorkflow:
             )
 
             if consent.get("status") == "opted_out":
-                return {"status": "blocked_no_consent", "message_id": store_result.get("message_id")}
+                return {
+                    "status": "blocked_no_consent",
+                    "message_id": store_result.get("message_id"),
+                }
 
         # 5. Dispatch to LangGraph agent via Agent Dispatch Workflow
         from app.workflows.agent_dispatch import AgentDispatchInput, AgentDispatchWorkflow
@@ -181,6 +186,7 @@ class SMSIntakeWorkflow:
 # ---------------------------------------------------------------------------
 # Helper to start the workflow from the webhook endpoint
 # ---------------------------------------------------------------------------
+
 
 async def start_sms_intake_workflow(
     message_sid: str,

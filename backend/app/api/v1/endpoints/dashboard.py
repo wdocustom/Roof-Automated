@@ -7,8 +7,7 @@ Phase 5: Provides data for the owner-facing dashboard:
   - Per-tenant cost tracking
 """
 
-import uuid
-from datetime import datetime, timezone, timedelta
+from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy import func, select
@@ -32,23 +31,20 @@ async def get_insights(company_id: str = Depends(get_company_id)):
     async with get_tenant_session(company_id) as session:
         # Count projects by status
         status_result = await session.execute(
-            select(Project.status, func.count(Project.id))
-            .group_by(Project.status)
+            select(Project.status, func.count(Project.id)).group_by(Project.status)
         )
         status_counts = {row[0].value: row[1] for row in status_result.all()}
 
         # Count events in last 7 days
-        week_ago = datetime.now(timezone.utc) - timedelta(days=7)
+        week_ago = datetime.now(UTC) - timedelta(days=7)
         event_count_result = await session.execute(
-            select(func.count(ProjectEvent.id))
-            .where(ProjectEvent.created_at >= week_ago)
+            select(func.count(ProjectEvent.id)).where(ProjectEvent.created_at >= week_ago)
         )
         events_this_week = event_count_result.scalar() or 0
 
         # Count escalations in last 7 days
         escalation_result = await session.execute(
-            select(func.count(ProjectEvent.id))
-            .where(
+            select(func.count(ProjectEvent.id)).where(
                 ProjectEvent.event_type == "human_escalation",
                 ProjectEvent.created_at >= week_ago,
             )
@@ -57,16 +53,16 @@ async def get_insights(company_id: str = Depends(get_company_id)):
 
         # Active projects (in_progress or scheduled)
         active_result = await session.execute(
-            select(func.count(Project.id))
-            .where(Project.status.in_([ProjectStatus.IN_PROGRESS, ProjectStatus.SCHEDULED]))
+            select(func.count(Project.id)).where(
+                Project.status.in_([ProjectStatus.IN_PROGRESS, ProjectStatus.SCHEDULED])
+            )
         )
         active_projects = active_result.scalar() or 0
 
         # Completed projects this month
-        month_start = datetime.now(timezone.utc).replace(day=1, hour=0, minute=0, second=0)
+        month_start = datetime.now(UTC).replace(day=1, hour=0, minute=0, second=0)
         completed_result = await session.execute(
-            select(func.count(Project.id))
-            .where(
+            select(func.count(Project.id)).where(
                 Project.status.in_([ProjectStatus.COMPLETED, ProjectStatus.PAID]),
                 Project.updated_at >= month_start,
             )
@@ -75,8 +71,7 @@ async def get_insights(company_id: str = Depends(get_company_id)):
 
     # Calculate escalation rate
     escalation_rate = (
-        round(escalations_this_week / events_this_week * 100, 1)
-        if events_this_week > 0 else 0.0
+        round(escalations_this_week / events_this_week * 100, 1) if events_this_week > 0 else 0.0
     )
 
     return {
@@ -108,7 +103,7 @@ async def get_agent_metrics(
     """
     from app.agents.events import ProjectEvent
 
-    cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+    cutoff = datetime.now(UTC) - timedelta(days=days)
 
     async with get_tenant_session(company_id) as session:
         # Events by agent
@@ -143,7 +138,7 @@ async def get_active_alerts(company_id: str = Depends(get_company_id)):
     """
     from app.agents.events import ProjectEvent
 
-    day_ago = datetime.now(timezone.utc) - timedelta(days=1)
+    day_ago = datetime.now(UTC) - timedelta(days=1)
 
     alert_event_types = [
         "human_escalation",
@@ -168,15 +163,17 @@ async def get_active_alerts(company_id: str = Depends(get_company_id)):
     alerts = []
     for e in events:
         severity = "high" if e.event_type in ("human_escalation", "payment_overdue") else "medium"
-        alerts.append({
-            "id": str(e.id),
-            "type": e.event_type,
-            "severity": severity,
-            "project_id": str(e.project_id),
-            "description": e.description or "",
-            "data": e.data or {},
-            "created_at": e.created_at.isoformat() if e.created_at else "",
-        })
+        alerts.append(
+            {
+                "id": str(e.id),
+                "type": e.event_type,
+                "severity": severity,
+                "project_id": str(e.project_id),
+                "description": e.description or "",
+                "data": e.data or {},
+                "created_at": e.created_at.isoformat() if e.created_at else "",
+            }
+        )
 
     return {
         "alerts": alerts,
@@ -196,20 +193,20 @@ async def get_cost_tracking(
     """
     from app.agents.events import ProjectEvent
 
-    cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+    cutoff = datetime.now(UTC) - timedelta(days=days)
 
     async with get_tenant_session(company_id) as session:
         # Count total events as a proxy for agent invocations
         event_count = await session.execute(
-            select(func.count(ProjectEvent.id))
-            .where(ProjectEvent.created_at >= cutoff)
+            select(func.count(ProjectEvent.id)).where(ProjectEvent.created_at >= cutoff)
         )
         total_events = event_count.scalar() or 0
 
         # Count projects touched
         project_count = await session.execute(
-            select(func.count(func.distinct(ProjectEvent.project_id)))
-            .where(ProjectEvent.created_at >= cutoff)
+            select(func.count(func.distinct(ProjectEvent.project_id))).where(
+                ProjectEvent.created_at >= cutoff
+            )
         )
         projects_touched = project_count.scalar() or 0
 
@@ -245,9 +242,7 @@ def _generate_insights(
         )
 
     if completed_this_month > 0:
-        insights.append(
-            f"{completed_this_month} projects completed this month."
-        )
+        insights.append(f"{completed_this_month} projects completed this month.")
 
     leads = status_counts.get("lead", 0)
     if leads > 5:

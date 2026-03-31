@@ -7,11 +7,10 @@ days later). Uses JSONB for flexible state storage.
 
 import json
 import uuid
-from datetime import datetime, timezone
-from typing import Any
+from datetime import UTC, datetime
 
 from langgraph.checkpoint.base import BaseCheckpointSaver, Checkpoint, CheckpointMetadata
-from sqlalchemy import Column, DateTime, String, Text, text
+from sqlalchemy import Column, DateTime, String, text
 from sqlalchemy.dialects.postgresql import JSONB
 
 from app.core.database import async_session_factory
@@ -29,7 +28,7 @@ class AgentCheckpoint(Base):
     checkpoint_data = Column(JSONB, nullable=False)
     metadata_json = Column(JSONB, nullable=True)
     company_id = Column(String(36), nullable=False, index=True)
-    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
 
 
 class PostgresCheckpointer(BaseCheckpointSaver):
@@ -68,7 +67,7 @@ class PostgresCheckpointer(BaseCheckpointSaver):
             return Checkpoint(
                 v=1,
                 id=row.id,
-                ts=datetime.now(timezone.utc).isoformat(),
+                ts=datetime.now(UTC).isoformat(),
                 channel_values=row.checkpoint_data.get("channel_values", {}),
                 channel_versions=row.checkpoint_data.get("channel_versions", {}),
                 versions_seen=row.checkpoint_data.get("versions_seen", {}),
@@ -106,7 +105,7 @@ class PostgresCheckpointer(BaseCheckpointSaver):
                     "data": json.dumps(checkpoint_data),
                     "meta": json.dumps(metadata) if metadata else None,
                     "cid": self.company_id,
-                    "ts": datetime.now(timezone.utc),
+                    "ts": datetime.now(UTC),
                 },
             )
             await session.commit()

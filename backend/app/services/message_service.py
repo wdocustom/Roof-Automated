@@ -1,7 +1,5 @@
 """Message storage and retrieval service."""
 
-import uuid
-
 from sqlalchemy import select
 
 from app.core.database import get_system_session, get_tenant_session

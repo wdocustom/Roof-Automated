@@ -15,9 +15,9 @@ Partner integrations are abstracted — initially supports a generic
 webhook-based partner API, extensible for specific providers.
 """
 
-from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from enum import Enum
+from dataclasses import dataclass
+from datetime import UTC, datetime
+from enum import StrEnum
 
 import httpx
 import structlog
@@ -32,13 +32,13 @@ from app.integrations.eagleview.client import (
 logger = structlog.get_logger()
 
 
-class DronePartner(str, Enum):
+class DronePartner(StrEnum):
     GENERIC = "generic"
     # Future: DRONEBASE = "dronebase"
     # Future: ZEITVIEW = "zeitview"
 
 
-class SurveyStatus(str, Enum):
+class SurveyStatus(StrEnum):
     REQUESTED = "requested"
     ACCEPTED = "accepted"
     SCHEDULED = "scheduled"
@@ -49,7 +49,7 @@ class SurveyStatus(str, Enum):
     FAILED = "failed"
 
 
-class SurveyPriority(str, Enum):
+class SurveyPriority(StrEnum):
     STANDARD = "standard"  # 3-5 business days
     RUSH = "rush"  # 1-2 business days
     EMERGENCY = "emergency"  # Same day (storm damage)
@@ -78,12 +78,8 @@ class DroneService:
     """Manages drone survey requests and partner communication."""
 
     def __init__(self, partner_api_url: str = "", partner_api_key: str = ""):
-        self.partner_api_url = partner_api_url or getattr(
-            settings, "drone_partner_api_url", ""
-        )
-        self.partner_api_key = partner_api_key or getattr(
-            settings, "drone_partner_api_key", ""
-        )
+        self.partner_api_url = partner_api_url or getattr(settings, "drone_partner_api_url", "")
+        self.partner_api_key = partner_api_key or getattr(settings, "drone_partner_api_key", "")
 
     async def request_survey(
         self,
@@ -105,7 +101,7 @@ class DroneService:
             priority=priority,
             survey_type=survey_type,
             notes=notes,
-            requested_at=datetime.now(timezone.utc).isoformat(),
+            requested_at=datetime.now(UTC).isoformat(),
         )
 
         if not self.partner_api_url:
@@ -250,10 +246,7 @@ def should_request_drone_survey(
     if total_sqft and total_sqft > 4000:
         return True
 
-    if stories and stories >= 3:
-        return True
-
-    return False
+    return bool(stories and stories >= 3)
 
 
 # Default service

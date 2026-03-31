@@ -14,19 +14,17 @@ scheduled as recurring Temporal activities.
 from __future__ import annotations
 
 import operator
-from datetime import datetime, timedelta, timezone
-from typing import Annotated, Any, TypedDict
+from typing import Annotated, TypedDict
 
 from langgraph.graph import END, StateGraph
 
 from app.agents.events import Event, EventType, emit_event
-from app.integrations.llm.router import LLMRequest, ModelTier, llm_router
 from app.integrations.weather.client import weather_provider
-
 
 # ---------------------------------------------------------------------------
 # State
 # ---------------------------------------------------------------------------
+
 
 class ExecutionState(TypedDict):
     """State for the project execution agent."""
@@ -62,6 +60,7 @@ class ExecutionState(TypedDict):
 # ---------------------------------------------------------------------------
 # Nodes
 # ---------------------------------------------------------------------------
+
 
 async def check_weather(state: ExecutionState) -> dict:
     """Check weather forecast for the job location."""
@@ -145,33 +144,39 @@ async def propose_reschedule(state: ExecutionState) -> dict:
     messages = []
 
     if customer_phone and proposed:
-        messages.append({
-            "to": customer_phone,
-            "body": (
-                f"Weather update: We need to reschedule your job due to {reason}. "
-                f"Proposing {proposed} instead. Reply YES to confirm or suggest "
-                f"an alternative date."
-            ),
-        })
+        messages.append(
+            {
+                "to": customer_phone,
+                "body": (
+                    f"Weather update: We need to reschedule your job due to {reason}. "
+                    f"Proposing {proposed} instead. Reply YES to confirm or suggest "
+                    f"an alternative date."
+                ),
+            }
+        )
 
     if crew_lead_phone and proposed:
-        messages.append({
-            "to": crew_lead_phone,
-            "body": (
-                f"Schedule change: Job at project {state['project_id'][:8]}... "
-                f"rescheduled to {proposed} due to weather. Confirm availability."
-            ),
-        })
+        messages.append(
+            {
+                "to": crew_lead_phone,
+                "body": (
+                    f"Schedule change: Job at project {state['project_id'][:8]}... "
+                    f"rescheduled to {proposed} due to weather. Confirm availability."
+                ),
+            }
+        )
 
-    events = [{
-        "type": EventType.JOB_RESCHEDULED.value,
-        "data": {
-            "reason": reason,
-            "original_date": state.get("scheduled_start", ""),
-            "proposed_date": proposed,
-        },
-        "description": f"Rescheduled from {state.get('scheduled_start', 'N/A')[:10]} to {proposed}: {reason}",
-    }]
+    events = [
+        {
+            "type": EventType.JOB_RESCHEDULED.value,
+            "data": {
+                "reason": reason,
+                "original_date": state.get("scheduled_start", ""),
+                "proposed_date": proposed,
+            },
+            "description": f"Rescheduled from {state.get('scheduled_start', 'N/A')[:10]} to {proposed}: {reason}",
+        }
+    ]
 
     return {
         "messages_to_send": messages,
@@ -193,21 +198,25 @@ async def dispatch_crew(state: ExecutionState) -> dict:
             forecast_today = f"Weather: {day['conditions']}, High {day['temp_high_f']}°F"
             break
 
-    messages = [{
-        "to": crew_lead_phone,
-        "body": (
-            f"Dispatch confirmed for today.\n"
-            f"Project: {state['project_id'][:8]}...\n"
-            f"{forecast_today}\n"
-            f"Upload progress photos at each milestone. Text COMPLETE when done."
-        ),
-    }]
+    messages = [
+        {
+            "to": crew_lead_phone,
+            "body": (
+                f"Dispatch confirmed for today.\n"
+                f"Project: {state['project_id'][:8]}...\n"
+                f"{forecast_today}\n"
+                f"Upload progress photos at each milestone. Text COMPLETE when done."
+            ),
+        }
+    ]
 
-    events = [{
-        "type": EventType.CREW_DISPATCHED.value,
-        "data": {"crew_lead_phone": crew_lead_phone},
-        "description": "Crew dispatched for scheduled work",
-    }]
+    events = [
+        {
+            "type": EventType.CREW_DISPATCHED.value,
+            "data": {"crew_lead_phone": crew_lead_phone},
+            "description": "Crew dispatched for scheduled work",
+        }
+    ]
 
     return {
         "messages_to_send": messages,
@@ -222,11 +231,13 @@ async def send_messages(state: ExecutionState) -> dict:
 
     from_phone = state.get("from_phone", "")
     for msg in state.get("messages_to_send", []):
-        await send_text_message.ainvoke({
-            "to_phone": msg["to"],
-            "body": msg["body"],
-            "from_phone": from_phone,
-        })
+        await send_text_message.ainvoke(
+            {
+                "to_phone": msg["to"],
+                "body": msg["body"],
+                "from_phone": from_phone,
+            }
+        )
 
     # Emit all queued events
     for event_data in state.get("events_to_emit", []):
@@ -248,6 +259,7 @@ async def send_messages(state: ExecutionState) -> dict:
 # Routing
 # ---------------------------------------------------------------------------
 
+
 def route_after_evaluate(state: ExecutionState) -> str:
     if state.get("reschedule_reason"):
         return "reschedule"
@@ -257,6 +269,7 @@ def route_after_evaluate(state: ExecutionState) -> str:
 # ---------------------------------------------------------------------------
 # Graph
 # ---------------------------------------------------------------------------
+
 
 def build_execution_graph() -> StateGraph:
     """Build the Project Execution Agent graph.
@@ -277,10 +290,14 @@ def build_execution_graph() -> StateGraph:
     graph.set_entry_point("check_weather")
     graph.add_edge("check_weather", "evaluate")
 
-    graph.add_conditional_edges("evaluate", route_after_evaluate, {
-        "reschedule": "reschedule",
-        "dispatch": "dispatch",
-    })
+    graph.add_conditional_edges(
+        "evaluate",
+        route_after_evaluate,
+        {
+            "reschedule": "reschedule",
+            "dispatch": "dispatch",
+        },
+    )
 
     graph.add_edge("reschedule", "send_messages")
     graph.add_edge("dispatch", "send_messages")

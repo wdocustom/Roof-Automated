@@ -9,16 +9,6 @@ import asyncio
 from temporalio.worker import Worker
 
 from app.core.config import settings
-from app.workflows.client import get_temporal_client
-
-# Phase 1: SMS intake
-from app.workflows.sms_intake import (
-    SMSIntakeWorkflow,
-    check_consent_status,
-    handle_opt_out,
-    send_help_response,
-    store_inbound_message,
-)
 
 # Phase 2: Agent dispatch
 from app.workflows.agent_dispatch import (
@@ -28,6 +18,7 @@ from app.workflows.agent_dispatch import (
     run_customer_engagement_agent,
     run_lead_onboarding_agent,
 )
+from app.workflows.client import get_temporal_client
 
 # Phase 3: Project lifecycle + swarm agents
 from app.workflows.project_lifecycle import (
@@ -37,6 +28,15 @@ from app.workflows.project_lifecycle import (
     run_orchestrator,
     run_payment_agent,
     run_qc_agent,
+)
+
+# Phase 1: SMS intake
+from app.workflows.sms_intake import (
+    SMSIntakeWorkflow,
+    check_consent_status,
+    handle_opt_out,
+    send_help_response,
+    store_inbound_message,
 )
 
 

@@ -19,21 +19,21 @@ checkpointed to PostgreSQL so conversations can resume after interruptions.
 from __future__ import annotations
 
 import operator
-from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 from typing import Annotated, Any, TypedDict
 
 from langgraph.graph import END, StateGraph
 
 from app.integrations.llm.router import LLMRequest, ModelTier, llm_router
 
-
 # ---------------------------------------------------------------------------
 # Agent State
 # ---------------------------------------------------------------------------
 
-class LeadStage(str, Enum):
+
+class LeadStage(StrEnum):
     """Current stage of the lead onboarding process."""
+
     NEW = "new"
     QUALIFYING = "qualifying"
     AWAITING_PHOTOS = "awaiting_photos"
@@ -91,6 +91,7 @@ class LeadState(TypedDict):
 # Graph Nodes
 # ---------------------------------------------------------------------------
 
+
 async def classify_intent(state: LeadState) -> dict:
     """Classify the customer's intent using the fast LLM tier."""
     text = state["current_input"]
@@ -129,7 +130,7 @@ async def qualify_lead(state: LeadState) -> dict:
     """Determine what information we still need from the lead."""
     has_address = bool(state.get("property_address"))
     has_photos = bool(state.get("media_urls")) or bool(state.get("photo_analysis"))
-    has_project_type = bool(state.get("project_type"))
+    bool(state.get("project_type"))
 
     # Build conversation context
     conversation = "\n".join(
@@ -203,16 +204,21 @@ async def analyze_photos(state: LeadState) -> dict:
     """Analyze customer photos using LLM vision."""
     media_urls = state.get("media_urls", [])
     if not media_urls:
-        return {"stage": "qualifying", "response_text": "Could you send a photo of your roof/siding? It helps us give a more accurate estimate."}
+        return {
+            "stage": "qualifying",
+            "response_text": "Could you send a photo of your roof/siding? It helps us give a more accurate estimate.",
+        }
 
     from app.agents.tools.vision import analyze_roof_photo
 
     # Analyze the first photo
-    analysis = await analyze_roof_photo.ainvoke({
-        "image_url": media_urls[0],
-        "context": f"Project type: {state.get('project_type', 'unknown')}",
-        "tenant_id": state.get("company_id"),
-    })
+    analysis = await analyze_roof_photo.ainvoke(
+        {
+            "image_url": media_urls[0],
+            "context": f"Project type: {state.get('project_type', 'unknown')}",
+            "tenant_id": state.get("company_id"),
+        }
+    )
 
     updates: dict[str, Any] = {
         "photo_analysis": analysis,
@@ -284,18 +290,17 @@ async def check_human_review(state: LeadState) -> dict:
     - Confidence is below company's threshold
     - Photo analysis flagged issues
     """
+    from sqlalchemy import select
+
     from app.core.database import get_tenant_session
     from app.models.company import Company
-    from sqlalchemy import select
 
     company_id = state["company_id"]
     estimate_high = state.get("estimate_high", 0)
     confidence = state.get("confidence", 0)
 
     async with get_tenant_session(company_id) as session:
-        result = await session.execute(
-            select(Company).where(Company.clerk_org_id == company_id)
-        )
+        result = await session.execute(select(Company).where(Company.clerk_org_id == company_id))
         company = result.scalar_one_or_none()
 
     threshold_dollars = 5000.0
@@ -307,7 +312,9 @@ async def check_human_review(state: LeadState) -> dict:
 
     reasons = []
     if estimate_high > threshold_dollars:
-        reasons.append(f"Estimate ${estimate_high:,.0f} exceeds ${threshold_dollars:,.0f} threshold")
+        reasons.append(
+            f"Estimate ${estimate_high:,.0f} exceeds ${threshold_dollars:,.0f} threshold"
+        )
     if confidence < confidence_threshold:
         reasons.append(f"Confidence {confidence:.0%} below {confidence_threshold:.0%} threshold")
 
@@ -329,11 +336,13 @@ async def send_response(state: LeadState) -> dict:
     if not response_text:
         return {}
 
-    await send_text_message.ainvoke({
-        "to_phone": state["customer_phone"],
-        "body": response_text,
-        "from_phone": state.get("from_phone"),
-    })
+    await send_text_message.ainvoke(
+        {
+            "to_phone": state["customer_phone"],
+            "body": response_text,
+            "from_phone": state.get("from_phone"),
+        }
+    )
 
     return {
         "messages": [{"role": "assistant", "content": response_text}],
@@ -354,6 +363,7 @@ async def escalate_to_human(state: LeadState) -> dict:
 # Routing Logic
 # ---------------------------------------------------------------------------
 
+
 def route_after_classify(state: LeadState) -> str:
     """Route based on classified intent."""
     intent = state.get("intent", "")
@@ -370,9 +380,7 @@ def route_after_qualify(state: LeadState) -> str:
     stage = state.get("stage", "qualifying")
     has_photos = bool(state.get("media_urls"))
 
-    if stage == "estimating" or (
-        state.get("property_address") and has_photos
-    ):
+    if stage == "estimating" or (state.get("property_address") and has_photos):
         return "analyze_photos" if has_photos and not state.get("photo_analysis") else "estimate"
     elif stage == "awaiting_photos":
         return "respond"
@@ -395,6 +403,7 @@ def route_after_review(state: LeadState) -> str:
 # ---------------------------------------------------------------------------
 # Build the Graph
 # ---------------------------------------------------------------------------
+
 
 def build_lead_onboarding_graph() -> StateGraph:
     """Construct the Lead Onboarding Agent graph.
@@ -419,27 +428,43 @@ def build_lead_onboarding_graph() -> StateGraph:
     graph.set_entry_point("classify")
 
     # Add edges
-    graph.add_conditional_edges("classify", route_after_classify, {
-        "qualify": "qualify",
-        "escalate": "escalate",
-    })
+    graph.add_conditional_edges(
+        "classify",
+        route_after_classify,
+        {
+            "qualify": "qualify",
+            "escalate": "escalate",
+        },
+    )
 
-    graph.add_conditional_edges("qualify", route_after_qualify, {
-        "analyze_photos": "analyze_photos",
-        "estimate": "estimate",
-        "respond": "respond",
-    })
+    graph.add_conditional_edges(
+        "qualify",
+        route_after_qualify,
+        {
+            "analyze_photos": "analyze_photos",
+            "estimate": "estimate",
+            "respond": "respond",
+        },
+    )
 
-    graph.add_conditional_edges("analyze_photos", route_after_analysis, {
-        "estimate": "estimate",
-    })
+    graph.add_conditional_edges(
+        "analyze_photos",
+        route_after_analysis,
+        {
+            "estimate": "estimate",
+        },
+    )
 
     graph.add_edge("estimate", "check_review")
 
-    graph.add_conditional_edges("check_review", route_after_review, {
-        "escalate": "escalate",
-        "respond": "respond",
-    })
+    graph.add_conditional_edges(
+        "check_review",
+        route_after_review,
+        {
+            "escalate": "escalate",
+            "respond": "respond",
+        },
+    )
 
     graph.add_edge("escalate", "respond")
     graph.add_edge("respond", END)
@@ -454,6 +479,7 @@ lead_onboarding_graph = build_lead_onboarding_graph().compile()
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _parse_agent_response(content: str) -> dict:
     """Parse structured agent response into dict."""

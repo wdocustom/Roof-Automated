@@ -1,13 +1,10 @@
 """Tests for the Payment & Closure Agent."""
 
-import pytest
-
 from app.agents.graphs.payment_closure import (
     PaymentState,
     build_payment_graph,
     route_after_determine,
 )
-from app.agents.events import EventType
 
 
 def _make_state(**overrides) -> PaymentState:
@@ -36,21 +33,15 @@ def _make_state(**overrides) -> PaymentState:
 
 class TestPaymentRouting:
     def test_routes_milestone_to_invoice(self):
-        state = _make_state(
-            current_milestone_payment={"type": "milestone_invoice", "amount": 4250}
-        )
+        state = _make_state(current_milestone_payment={"type": "milestone_invoice", "amount": 4250})
         assert route_after_determine(state) == "invoice"
 
     def test_routes_final_to_invoice(self):
-        state = _make_state(
-            current_milestone_payment={"type": "final_invoice", "amount": 4250}
-        )
+        state = _make_state(current_milestone_payment={"type": "final_invoice", "amount": 4250})
         assert route_after_determine(state) == "invoice"
 
     def test_routes_overdue_to_reminder(self):
-        state = _make_state(
-            current_milestone_payment={"type": "reminder", "amount": 8500}
-        )
+        state = _make_state(current_milestone_payment={"type": "reminder", "amount": 8500})
         assert route_after_determine(state) == "reminder"
 
     def test_routes_paid_to_warranty(self):

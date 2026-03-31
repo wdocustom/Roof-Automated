@@ -1,18 +1,26 @@
 """Tests for data model enums and schema integrity."""
 
-from app.models.project import ProjectStatus, ProjectType
-from app.models.rate_card import MaterialCategory, LaborTaskType, RoofComplexity
-from app.models.message import MessageDirection, MessageChannel
 from app.models.consent import ConsentStatus
+from app.models.project import ProjectStatus, ProjectType
+from app.models.rate_card import LaborTaskType, MaterialCategory, RoofComplexity
 
 
 class TestProjectEnums:
     def test_status_pipeline_order(self):
         """Verify the full project lifecycle pipeline exists."""
         expected = [
-            "lead", "onboarded", "estimated", "contract_sent", "contract_signed",
-            "scheduled", "in_progress", "qc_review", "completed", "invoiced",
-            "paid", "cancelled",
+            "lead",
+            "onboarded",
+            "estimated",
+            "contract_sent",
+            "contract_signed",
+            "scheduled",
+            "in_progress",
+            "qc_review",
+            "completed",
+            "invoiced",
+            "paid",
+            "cancelled",
         ]
         actual = [s.value for s in ProjectStatus]
         assert actual == expected

@@ -5,7 +5,6 @@ Stubbed interface allows swapping to Meteomatics/Xweather later.
 """
 
 from dataclasses import dataclass
-from datetime import date, datetime
 
 import httpx
 
@@ -93,26 +92,30 @@ class VisualCrossingProvider(WeatherProvider):
                 temp_high=day_data.get("tempmax", 70),
                 temp_low=day_data.get("tempmin", 50),
             )
-            forecast_days.append(DayForecast(
-                date=day_data.get("datetime", ""),
-                temp_high_f=day_data.get("tempmax", 0),
-                temp_low_f=day_data.get("tempmin", 0),
-                precip_chance=day_data.get("precipprob", 0),
-                precip_inches=day_data.get("precip", 0),
-                wind_speed_mph=day_data.get("windspeed", 0),
-                conditions=day_data.get("conditions", "Unknown"),
-                is_workable=is_workable,
-            ))
+            forecast_days.append(
+                DayForecast(
+                    date=day_data.get("datetime", ""),
+                    temp_high_f=day_data.get("tempmax", 0),
+                    temp_low_f=day_data.get("tempmin", 0),
+                    precip_chance=day_data.get("precipprob", 0),
+                    precip_inches=day_data.get("precip", 0),
+                    wind_speed_mph=day_data.get("windspeed", 0),
+                    conditions=day_data.get("conditions", "Unknown"),
+                    is_workable=is_workable,
+                )
+            )
 
         alerts = []
         for alert_data in data.get("alerts", []):
-            alerts.append(WeatherAlert(
-                alert_type=_classify_alert(alert_data.get("event", "")),
-                severity=alert_data.get("severity", "advisory"),
-                description=alert_data.get("description", ""),
-                start_time=alert_data.get("onset", ""),
-                end_time=alert_data.get("ends", ""),
-            ))
+            alerts.append(
+                WeatherAlert(
+                    alert_type=_classify_alert(alert_data.get("event", "")),
+                    severity=alert_data.get("severity", "advisory"),
+                    description=alert_data.get("description", ""),
+                    start_time=alert_data.get("onset", ""),
+                    end_time=alert_data.get("ends", ""),
+                )
+            )
 
         return WeatherForecast(
             location=zip_code,
@@ -142,9 +145,7 @@ def _is_workable_day(
         return False
     if temp_low < 35:
         return False
-    if temp_high > 105:
-        return False
-    return True
+    return not temp_high > 105
 
 
 def _classify_alert(event: str) -> str:
@@ -166,16 +167,18 @@ def _mock_forecast(zip_code: str, days: int) -> WeatherForecast:
     """Return mock forecast for development/testing."""
     mock_days = []
     for i in range(days):
-        mock_days.append(DayForecast(
-            date=f"2026-04-{i + 1:02d}",
-            temp_high_f=72.0,
-            temp_low_f=55.0,
-            precip_chance=10.0 if i != 2 else 80.0,  # Rain on day 3
-            precip_inches=0.0 if i != 2 else 1.2,
-            wind_speed_mph=8.0,
-            conditions="Clear" if i != 2 else "Rain",
-            is_workable=i != 2,
-        ))
+        mock_days.append(
+            DayForecast(
+                date=f"2026-04-{i + 1:02d}",
+                temp_high_f=72.0,
+                temp_low_f=55.0,
+                precip_chance=10.0 if i != 2 else 80.0,  # Rain on day 3
+                precip_inches=0.0 if i != 2 else 1.2,
+                wind_speed_mph=8.0,
+                conditions="Clear" if i != 2 else "Rain",
+                is_workable=i != 2,
+            )
+        )
 
     return WeatherForecast(
         location=zip_code,

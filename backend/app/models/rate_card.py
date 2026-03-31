@@ -21,10 +21,10 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import BaseModel, TenantMixin
 
-
 # ---------------------------------------------------------------------------
 # Rate Card Versioning — audit trail for all pricing changes
 # ---------------------------------------------------------------------------
+
 
 class RateCardVersion(BaseModel, TenantMixin):
     """Snapshot of when rate cards were last updated. Supports audit trail."""
@@ -41,7 +41,8 @@ class RateCardVersion(BaseModel, TenantMixin):
 # Materials
 # ---------------------------------------------------------------------------
 
-class MaterialCategory(str, enum.Enum):
+
+class MaterialCategory(enum.StrEnum):
     SHINGLES = "shingles"
     UNDERLAYMENT = "underlayment"
     FLASHING = "flashing"
@@ -58,7 +59,7 @@ class MaterialCategory(str, enum.Enum):
     OTHER = "other"
 
 
-class UnitType(str, enum.Enum):
+class UnitType(enum.StrEnum):
     SQUARE = "square"  # 100 sq ft (roofing standard)
     BUNDLE = "bundle"
     LINEAR_FOOT = "linear_foot"
@@ -101,10 +102,11 @@ class Material(BaseModel, TenantMixin):
 # Waste Factors — vary by material category and roof complexity
 # ---------------------------------------------------------------------------
 
-class RoofComplexity(str, enum.Enum):
-    SIMPLE = "simple"      # Gable, few penetrations
+
+class RoofComplexity(enum.StrEnum):
+    SIMPLE = "simple"  # Gable, few penetrations
     MODERATE = "moderate"  # Hip, some valleys/penetrations
-    COMPLEX = "complex"    # Cut-up, many valleys/dormers
+    COMPLEX = "complex"  # Cut-up, many valleys/dormers
     VERY_COMPLEX = "very_complex"  # Mansard, turrets, steep pitch
 
 
@@ -124,7 +126,8 @@ class WasteFactor(BaseModel, TenantMixin):
 # Labor Rates
 # ---------------------------------------------------------------------------
 
-class LaborTaskType(str, enum.Enum):
+
+class LaborTaskType(enum.StrEnum):
     TEAR_OFF = "tear_off"
     INSTALL_SHINGLES = "install_shingles"
     INSTALL_UNDERLAYMENT = "install_underlayment"
@@ -138,7 +141,7 @@ class LaborTaskType(str, enum.Enum):
     OTHER = "other"
 
 
-class LaborRateUnit(str, enum.Enum):
+class LaborRateUnit(enum.StrEnum):
     PER_SQUARE = "per_square"
     PER_LINEAR_FOOT = "per_linear_foot"
     PER_HOUR = "per_hour"
@@ -173,6 +176,7 @@ class LaborRate(BaseModel, TenantMixin):
 # Permit Fees — jurisdiction-based lookup
 # ---------------------------------------------------------------------------
 
+
 class PermitFee(BaseModel, TenantMixin):
     """Permit fee by jurisdiction (ZIP code or city/county)."""
 
@@ -183,7 +187,9 @@ class PermitFee(BaseModel, TenantMixin):
     county: Mapped[str | None] = mapped_column(String(100))
     state: Mapped[str] = mapped_column(String(2), nullable=False)
 
-    permit_type: Mapped[str] = mapped_column(String(100), nullable=False)  # e.g., "roofing", "siding"
+    permit_type: Mapped[str] = mapped_column(
+        String(100), nullable=False
+    )  # e.g., "roofing", "siding"
     base_fee: Mapped[float] = mapped_column(Float, nullable=False)
     per_sqft_fee: Mapped[float] = mapped_column(Float, default=0.0)
     notes: Mapped[str | None] = mapped_column(Text)

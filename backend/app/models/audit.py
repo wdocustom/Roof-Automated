@@ -3,7 +3,7 @@
 import uuid
 
 from sqlalchemy import String, Text
-from sqlalchemy.dialects.postgresql import UUID, JSONB
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import BaseModel, TenantMixin
@@ -16,7 +16,9 @@ class AuditLog(BaseModel, TenantMixin):
 
     # What happened
     action: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
-    entity_type: Mapped[str] = mapped_column(String(50), nullable=False)  # e.g., "project", "message"
+    entity_type: Mapped[str] = mapped_column(
+        String(50), nullable=False
+    )  # e.g., "project", "message"
     entity_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
 
     # Who/what did it

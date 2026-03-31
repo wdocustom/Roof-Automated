@@ -1,6 +1,6 @@
 """TCPA consent management service."""
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy import select
 
@@ -36,7 +36,7 @@ async def record_opt_out(phone: str, company_id: str) -> None:
             phone_number=phone,
             status=ConsentStatus.OPTED_OUT,
             source=ConsentSource.TEXT_KEYWORD,
-            revoked_at=datetime.now(timezone.utc),
+            revoked_at=datetime.now(UTC),
             consent_text="Customer replied STOP",
         )
         session.add(consent)
@@ -58,7 +58,7 @@ async def record_opt_in(
             customer_id=customer_id,
             status=ConsentStatus.OPTED_IN,
             source=source,
-            consented_at=datetime.now(timezone.utc),
+            consented_at=datetime.now(UTC),
             consent_text=consent_text,
             ip_address=ip_address,
         )

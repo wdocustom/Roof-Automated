@@ -13,18 +13,16 @@ Key capabilities:
 """
 
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from enum import Enum
+from datetime import UTC, datetime
+from enum import StrEnum
 
 import httpx
 import structlog
 
-from app.core.config import settings
-
 logger = structlog.get_logger()
 
 
-class SupplierName(str, Enum):
+class SupplierName(StrEnum):
     ABC_SUPPLY = "abc_supply"
     BEACON = "beacon"
     SRS = "srs_distribution"
@@ -115,9 +113,7 @@ class SupplierPriceFeed:
         )
         return updates
 
-    def parse_webhook_update(
-        self, supplier: SupplierName, payload: dict
-    ) -> list[PriceUpdate]:
+    def parse_webhook_update(self, supplier: SupplierName, payload: dict) -> list[PriceUpdate]:
         """Parse a webhook price update from a supplier."""
         updates = []
 
@@ -153,14 +149,15 @@ class SupplierPriceFeed:
 
         Auto-applies small changes (<10%). Flags large changes for review.
         """
-        from sqlalchemy import select, update as sql_update
+        from sqlalchemy import select
+        from sqlalchemy import update as sql_update
 
         from app.core.database import get_tenant_session
         from app.models.rate_card import Material
 
         result = PriceFeedResult(
             supplier=updates[0].supplier if updates else SupplierName.GENERIC,
-            fetched_at=datetime.now(timezone.utc).isoformat(),
+            fetched_at=datetime.now(UTC).isoformat(),
         )
 
         async with get_tenant_session(company_id) as session:

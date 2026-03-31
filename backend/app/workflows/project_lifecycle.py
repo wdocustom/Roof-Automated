@@ -16,16 +16,13 @@ Key patterns:
 
 from dataclasses import dataclass
 from datetime import timedelta
-from typing import Any
 
 from temporalio import activity, workflow
-
-from app.core.config import settings
-
 
 # ---------------------------------------------------------------------------
 # Data Classes
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class ProjectLifecycleInput:
@@ -54,6 +51,7 @@ class MilestoneSignoffRequest:
 # ---------------------------------------------------------------------------
 # Activities — each wraps a LangGraph agent execution
 # ---------------------------------------------------------------------------
+
 
 @activity.defn
 async def run_orchestrator(company_id: str, project_id: str, trigger_event: dict) -> dict:
@@ -231,6 +229,7 @@ async def log_lifecycle_event(company_id: str, project_id: str, action: str, dat
 # Workflow
 # ---------------------------------------------------------------------------
 
+
 @workflow.defn
 class ProjectLifecycleWorkflow:
     """Long-running workflow that manages a project from contract to closure.
@@ -254,10 +253,12 @@ class ProjectLifecycleWorkflow:
     @workflow.signal
     async def milestone_completed(self, milestone_id: str, photo_urls: list[str]):
         """Signal: crew has completed a milestone and uploaded photos."""
-        self._milestone_events.append({
-            "milestone_id": milestone_id,
-            "photo_urls": photo_urls,
-        })
+        self._milestone_events.append(
+            {
+                "milestone_id": milestone_id,
+                "photo_urls": photo_urls,
+            }
+        )
 
     @workflow.signal
     async def human_approval(self, milestone_id: str, approved: bool):
@@ -349,32 +350,41 @@ class ProjectLifecycleWorkflow:
                     retry_policy=workflow.RetryPolicy(maximum_attempts=3),
                 )
 
-                actions_log.append({
-                    "phase": "qc",
-                    "milestone_id": milestone_id,
-                    "result": qc_result,
-                })
+                actions_log.append(
+                    {
+                        "phase": "qc",
+                        "milestone_id": milestone_id,
+                        "result": qc_result,
+                    }
+                )
 
                 # If human sign-off required, wait for signal
-                if qc_result.get("requires_human_signoff") or qc_result.get("recommendation") == "flag_for_review":
+                if (
+                    qc_result.get("requires_human_signoff")
+                    or qc_result.get("recommendation") == "flag_for_review"
+                ):
                     try:
                         await workflow.wait_condition(
                             lambda mid=milestone_id: mid in self._human_approvals,
                             timeout=timedelta(hours=48),
                         )
                     except TimeoutError:
-                        actions_log.append({
-                            "phase": "human_signoff_timeout",
-                            "milestone_id": milestone_id,
-                        })
+                        actions_log.append(
+                            {
+                                "phase": "human_signoff_timeout",
+                                "milestone_id": milestone_id,
+                            }
+                        )
                         continue
 
                     approved = self._human_approvals.get(milestone_id, False)
                     if not approved:
-                        actions_log.append({
-                            "phase": "human_rejected",
-                            "milestone_id": milestone_id,
-                        })
+                        actions_log.append(
+                            {
+                                "phase": "human_rejected",
+                                "milestone_id": milestone_id,
+                            }
+                        )
                         continue
 
                 # Milestone approved — trigger payment if applicable

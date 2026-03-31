@@ -18,7 +18,6 @@ from app.models.rate_card import (
     Material,
     MaterialCategory,
     PermitFee,
-    RoofComplexity,
     WasteFactor,
 )
 
@@ -285,7 +284,9 @@ async def generate_siding_estimate(
         # Labor
         result = await session.execute(
             select(LaborRate)
-            .where(LaborRate.task_type == LaborTaskType.INSTALL_SIDING, LaborRate.is_active.is_(True))
+            .where(
+                LaborRate.task_type == LaborTaskType.INSTALL_SIDING, LaborRate.is_active.is_(True)
+            )
             .limit(1)
         )
         rate = result.scalar_one_or_none()

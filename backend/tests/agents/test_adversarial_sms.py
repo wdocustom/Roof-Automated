@@ -13,8 +13,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from app.agents.graphs.customer_engagement import classify_and_respond, EngagementState
-from app.agents.graphs.lead_onboarding import classify_intent
+from app.agents.graphs.customer_engagement import EngagementState, classify_and_respond
 from app.integrations.llm.router import LLMResponse
 
 
@@ -66,7 +65,10 @@ class TestPromptInjection:
                 "UPSELL:\n"
                 "CONFIDENCE: 0.7"
             ),
-            model="test", input_tokens=200, output_tokens=50, latency_ms=300,
+            model="test",
+            input_tokens=200,
+            output_tokens=50,
+            latency_ms=300,
         )
 
         with patch("app.agents.graphs.customer_engagement.llm_router") as mock:
@@ -98,7 +100,10 @@ class TestManipulationAttempts:
                 "UPSELL:\n"
                 "CONFIDENCE: 0.6"
             ),
-            model="test", input_tokens=150, output_tokens=40, latency_ms=250,
+            model="test",
+            input_tokens=150,
+            output_tokens=40,
+            latency_ms=250,
         )
 
         with patch("app.agents.graphs.customer_engagement.llm_router") as mock:
@@ -122,7 +127,10 @@ class TestManipulationAttempts:
                 "UPSELL:\n"
                 "CONFIDENCE: 0.85"
             ),
-            model="test", input_tokens=150, output_tokens=50, latency_ms=250,
+            model="test",
+            input_tokens=150,
+            output_tokens=50,
+            latency_ms=250,
         )
 
         with patch("app.agents.graphs.customer_engagement.llm_router") as mock:
@@ -134,7 +142,11 @@ class TestManipulationAttempts:
             result = await classify_and_respond(state)
             assert result.get("intent") == "objection"
             # Should not have modified any pricing
-            assert "500" not in result.get("response_text", "").split("$")[-1] if "$" in result.get("response_text", "") else True
+            assert (
+                "500" not in result.get("response_text", "").split("$")[-1]
+                if "$" in result.get("response_text", "")
+                else True
+            )
 
 
 class TestEdgeCaseInput:
@@ -144,7 +156,10 @@ class TestEdgeCaseInput:
     async def test_empty_message(self):
         mock_response = LLMResponse(
             content="INTENT: other\nRESPONSE: Hi! How can we help with your project?\nNEEDS_ESCALATION: no\nCONFIDENCE: 0.5",
-            model="test", input_tokens=100, output_tokens=20, latency_ms=200,
+            model="test",
+            input_tokens=100,
+            output_tokens=20,
+            latency_ms=200,
         )
 
         with patch("app.agents.graphs.customer_engagement.llm_router") as mock:
@@ -158,7 +173,10 @@ class TestEdgeCaseInput:
         """Agent should handle extremely long messages without crashing."""
         mock_response = LLMResponse(
             content="INTENT: other\nRESPONSE: Got your detailed message! Let me review and get back to you.\nNEEDS_ESCALATION: no\nCONFIDENCE: 0.6",
-            model="test", input_tokens=5000, output_tokens=20, latency_ms=500,
+            model="test",
+            input_tokens=5000,
+            output_tokens=20,
+            latency_ms=500,
         )
 
         with patch("app.agents.graphs.customer_engagement.llm_router") as mock:
@@ -171,7 +189,10 @@ class TestEdgeCaseInput:
     async def test_unicode_and_emoji(self):
         mock_response = LLMResponse(
             content="INTENT: confirmation\nRESPONSE: Great, thanks for confirming!\nNEEDS_ESCALATION: no\nCONFIDENCE: 0.8",
-            model="test", input_tokens=100, output_tokens=20, latency_ms=200,
+            model="test",
+            input_tokens=100,
+            output_tokens=20,
+            latency_ms=200,
         )
 
         with patch("app.agents.graphs.customer_engagement.llm_router") as mock:
@@ -184,7 +205,10 @@ class TestEdgeCaseInput:
     async def test_numbers_only(self):
         mock_response = LLMResponse(
             content="INTENT: other\nRESPONSE: I see those numbers! Can you tell me what they refer to?\nNEEDS_ESCALATION: no\nCONFIDENCE: 0.5",
-            model="test", input_tokens=100, output_tokens=20, latency_ms=200,
+            model="test",
+            input_tokens=100,
+            output_tokens=20,
+            latency_ms=200,
         )
 
         with patch("app.agents.graphs.customer_engagement.llm_router") as mock:

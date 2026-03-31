@@ -123,12 +123,26 @@ def build_payment_schedule(
     num_milestones = len(milestones)
 
     if num_milestones == 1:
-        return [{"milestone": milestones[0].get("name", "Completion"), "percentage": 100, "amount": contract_amount}]
+        return [
+            {
+                "milestone": milestones[0].get("name", "Completion"),
+                "percentage": 100,
+                "amount": contract_amount,
+            }
+        ]
 
     if num_milestones == 2:
         return [
-            {"milestone": milestones[0].get("name", "Phase 1"), "percentage": 60, "amount": round(contract_amount * 0.6, 2)},
-            {"milestone": milestones[1].get("name", "Final"), "percentage": 40, "amount": round(contract_amount * 0.4, 2)},
+            {
+                "milestone": milestones[0].get("name", "Phase 1"),
+                "percentage": 60,
+                "amount": round(contract_amount * 0.6, 2),
+            },
+            {
+                "milestone": milestones[1].get("name", "Final"),
+                "percentage": 40,
+                "amount": round(contract_amount * 0.4, 2),
+            },
         ]
 
     # 3+ milestones: deposit / progress / final
@@ -138,24 +152,30 @@ def build_payment_schedule(
     progress_pct = 100 - deposit_pct - final_pct
     progress_per = progress_pct / max(num_milestones - 2, 1)
 
-    schedule.append({
-        "milestone": milestones[0].get("name", "Deposit"),
-        "percentage": deposit_pct,
-        "amount": round(contract_amount * deposit_pct / 100, 2),
-    })
+    schedule.append(
+        {
+            "milestone": milestones[0].get("name", "Deposit"),
+            "percentage": deposit_pct,
+            "amount": round(contract_amount * deposit_pct / 100, 2),
+        }
+    )
 
     for m in milestones[1:-1]:
-        schedule.append({
-            "milestone": m.get("name", "Progress"),
-            "percentage": round(progress_per, 1),
-            "amount": round(contract_amount * progress_per / 100, 2),
-        })
+        schedule.append(
+            {
+                "milestone": m.get("name", "Progress"),
+                "percentage": round(progress_per, 1),
+                "amount": round(contract_amount * progress_per / 100, 2),
+            }
+        )
 
-    schedule.append({
-        "milestone": milestones[-1].get("name", "Final"),
-        "percentage": final_pct,
-        "amount": round(contract_amount * final_pct / 100, 2),
-    })
+    schedule.append(
+        {
+            "milestone": milestones[-1].get("name", "Final"),
+            "percentage": final_pct,
+            "amount": round(contract_amount * final_pct / 100, 2),
+        }
+    )
 
     return schedule
 

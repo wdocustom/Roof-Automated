@@ -13,16 +13,16 @@ Uses project context + message history + semantic cache for continuity.
 from __future__ import annotations
 
 import operator
-from typing import Annotated, Any, TypedDict
+from typing import Annotated, TypedDict
 
 from langgraph.graph import END, StateGraph
 
 from app.integrations.llm.router import LLMRequest, ModelTier, llm_router
 
-
 # ---------------------------------------------------------------------------
 # Agent State
 # ---------------------------------------------------------------------------
+
 
 class EngagementState(TypedDict):
     """State for the customer engagement agent."""
@@ -54,6 +54,7 @@ class EngagementState(TypedDict):
 # Nodes
 # ---------------------------------------------------------------------------
 
+
 async def load_project_context(state: EngagementState) -> dict:
     """Load current project status and recent messages for context."""
     from app.agents.tools.project_tools import get_project_details
@@ -62,10 +63,12 @@ async def load_project_context(state: EngagementState) -> dict:
     if not project_id:
         return {"project_context": {}}
 
-    details = await get_project_details.ainvoke({
-        "company_id": state["company_id"],
-        "project_id": project_id,
-    })
+    details = await get_project_details.ainvoke(
+        {
+            "company_id": state["company_id"],
+            "project_id": project_id,
+        }
+    )
 
     return {"project_context": details}
 
@@ -170,11 +173,13 @@ async def send_response(state: EngagementState) -> dict:
     if not response_text:
         return {}
 
-    await send_text_message.ainvoke({
-        "to_phone": state["customer_phone"],
-        "body": response_text,
-        "from_phone": state.get("from_phone"),
-    })
+    await send_text_message.ainvoke(
+        {
+            "to_phone": state["customer_phone"],
+            "body": response_text,
+            "from_phone": state.get("from_phone"),
+        }
+    )
 
     return {
         "messages": [{"role": "assistant", "content": response_text}],
@@ -196,6 +201,7 @@ async def escalate(state: EngagementState) -> dict:
 # Routing
 # ---------------------------------------------------------------------------
 
+
 def route_after_classify(state: EngagementState) -> str:
     if state.get("needs_escalation"):
         return "escalate"
@@ -207,6 +213,7 @@ def route_after_classify(state: EngagementState) -> str:
 # ---------------------------------------------------------------------------
 # Build Graph
 # ---------------------------------------------------------------------------
+
 
 def build_customer_engagement_graph() -> StateGraph:
     """Construct the Customer Engagement Agent graph.
@@ -227,11 +234,15 @@ def build_customer_engagement_graph() -> StateGraph:
     graph.set_entry_point("load_context")
     graph.add_edge("load_context", "classify_respond")
 
-    graph.add_conditional_edges("classify_respond", route_after_classify, {
-        "escalate": "escalate",
-        "upsell": "upsell",
-        "respond": "respond",
-    })
+    graph.add_conditional_edges(
+        "classify_respond",
+        route_after_classify,
+        {
+            "escalate": "escalate",
+            "upsell": "upsell",
+            "respond": "respond",
+        },
+    )
 
     graph.add_edge("upsell", "respond")
     graph.add_edge("escalate", "respond")

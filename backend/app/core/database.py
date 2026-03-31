@@ -45,9 +45,7 @@ async def get_tenant_session(company_id: str) -> AsyncGenerator[AsyncSession]:
         # Inline the value instead of using a bind parameter because asyncpg's
         # prepared-statement protocol doesn't support parameterized SET commands
         # through Neon's connection pooler.
-        await session.execute(
-            text(f"SET LOCAL app.current_company_id = '{company_id}'")
-        )
+        await session.execute(text(f"SET LOCAL app.current_company_id = '{company_id}'"))
         try:
             yield session
             await session.commit()

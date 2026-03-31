@@ -10,16 +10,12 @@ This layer exists to:
 All LLM calls in the platform MUST go through this router.
 """
 
-import hashlib
-import json
 import time
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 
 import litellm
 import structlog
-
-from app.core.config import settings
 
 logger = structlog.get_logger()
 
@@ -27,13 +23,13 @@ logger = structlog.get_logger()
 litellm.set_verbose = False
 
 
-class ModelTier(str, Enum):
+class ModelTier(StrEnum):
     """Model tiers for cost-conscious routing."""
 
-    FAST = "fast"      # Classification, routing, simple parsing (Haiku / GPT-4o-mini)
+    FAST = "fast"  # Classification, routing, simple parsing (Haiku / GPT-4o-mini)
     STANDARD = "standard"  # Most agent tasks (Sonnet / GPT-4o)
     POWERFUL = "powerful"  # Complex reasoning, reflection (Opus / GPT-4o)
-    VISION = "vision"    # Image analysis (GPT-4o / Claude vision)
+    VISION = "vision"  # Image analysis (GPT-4o / Claude vision)
 
 
 # Default model mapping — override via config
@@ -140,9 +136,7 @@ class LLMRouter:
                 continue
 
         # All models failed
-        raise RuntimeError(
-            f"All models failed for tier {request.tier.value}: {last_error}"
-        )
+        raise RuntimeError(f"All models failed for tier {request.tier.value}: {last_error}")
 
     async def classify(self, text: str, categories: list[str], tenant_id: str | None = None) -> str:
         """Quick classification using the FAST tier. Returns the matched category."""

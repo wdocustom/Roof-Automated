@@ -14,7 +14,6 @@ All financial operations are logged in the audit trail for liability protection.
 from __future__ import annotations
 
 import operator
-from datetime import datetime, timezone
 from typing import Annotated, TypedDict
 
 from langgraph.graph import END, StateGraph
@@ -22,10 +21,10 @@ from langgraph.graph import END, StateGraph
 from app.agents.events import Event, EventType, emit_event
 from app.integrations.llm.router import LLMRequest, ModelTier, llm_router
 
-
 # ---------------------------------------------------------------------------
 # State
 # ---------------------------------------------------------------------------
+
 
 class PaymentState(TypedDict):
     """State for the Payment & Closure Agent."""
@@ -59,19 +58,23 @@ class PaymentState(TypedDict):
 # Nodes
 # ---------------------------------------------------------------------------
 
+
 async def load_payment_context(state: PaymentState) -> dict:
     """Load project financial state."""
     from app.agents.tools.project_tools import get_project_details
 
-    project = await get_project_details.ainvoke({
-        "company_id": state["company_id"],
-        "project_id": state["project_id"],
-    })
+    project = await get_project_details.ainvoke(
+        {
+            "company_id": state["company_id"],
+            "project_id": state["project_id"],
+        }
+    )
 
     contract_amount = project.get("contract_amount", 0) or 0
 
     # Sum payments received from event stream
     from app.agents.events import get_project_events
+
     events = await get_project_events(
         company_id=state["company_id"],
         project_id=state["project_id"],
@@ -81,8 +84,11 @@ async def load_payment_context(state: PaymentState) -> dict:
 
     # Build payment schedule from milestones
     from app.integrations.stripe.payments import build_payment_schedule
+
     milestones = project.get("milestones", [])
-    payment_schedule = build_payment_schedule(contract_amount, milestones) if contract_amount > 0 else []
+    payment_schedule = (
+        build_payment_schedule(contract_amount, milestones) if contract_amount > 0 else []
+    )
 
     return {
         "project_status": project.get("status", "unknown"),
@@ -100,7 +106,10 @@ async def determine_payment_action(state: PaymentState) -> dict:
     trigger_type = trigger.get("event_type", "")
     amount_due = state.get("amount_due", 0)
 
-    if trigger_type == EventType.MILESTONE_QC_PASSED.value or trigger_type == EventType.MILESTONE_HUMAN_APPROVED.value:
+    if (
+        trigger_type == EventType.MILESTONE_QC_PASSED.value
+        or trigger_type == EventType.MILESTONE_HUMAN_APPROVED.value
+    ):
         # Find the milestone-specific amount from the payment schedule
         milestone_name = trigger.get("data", {}).get("milestone", "Progress")
         schedule = state.get("payment_schedule", [])
@@ -110,25 +119,31 @@ async def determine_payment_action(state: PaymentState) -> dict:
                 milestone_amount = min(entry.get("amount", amount_due), amount_due)
                 break
 
-        return {"current_milestone_payment": {
-            "type": "milestone_invoice",
-            "amount": milestone_amount,
-            "description": f"Milestone payment: {milestone_name}",
-        }}
+        return {
+            "current_milestone_payment": {
+                "type": "milestone_invoice",
+                "amount": milestone_amount,
+                "description": f"Milestone payment: {milestone_name}",
+            }
+        }
 
     elif trigger_type == EventType.JOB_COMPLETED.value:
-        return {"current_milestone_payment": {
-            "type": "final_invoice",
-            "amount": amount_due,
-            "description": "Final payment for project completion",
-        }}
+        return {
+            "current_milestone_payment": {
+                "type": "final_invoice",
+                "amount": amount_due,
+                "description": "Final payment for project completion",
+            }
+        }
 
     elif trigger_type == EventType.PAYMENT_OVERDUE.value:
-        return {"current_milestone_payment": {
-            "type": "reminder",
-            "amount": amount_due,
-            "description": "Payment reminder",
-        }}
+        return {
+            "current_milestone_payment": {
+                "type": "reminder",
+                "amount": amount_due,
+                "description": "Payment reminder",
+            }
+        }
 
     return {"current_milestone_payment": {"type": "none"}}
 
@@ -157,26 +172,30 @@ async def send_invoice(state: PaymentState) -> dict:
         },
     )
 
-    messages = [{
-        "to": customer_phone,
-        "body": (
-            f"Invoice: ${amount:,.2f}\n"
-            f"{description}\n"
-            f"Property: {state.get('property_address', 'N/A')}\n\n"
-            f"Pay securely: {payment_url}\n\n"
-            f"Thank you for your business! Reply HELP for questions."
-        ),
-    }]
+    messages = [
+        {
+            "to": customer_phone,
+            "body": (
+                f"Invoice: ${amount:,.2f}\n"
+                f"{description}\n"
+                f"Property: {state.get('property_address', 'N/A')}\n\n"
+                f"Pay securely: {payment_url}\n\n"
+                f"Thank you for your business! Reply HELP for questions."
+            ),
+        }
+    ]
 
-    events = [{
-        "type": EventType.INVOICE_SENT.value,
-        "data": {
-            "amount": amount,
-            "payment_url": payment_url,
-            "description": description,
-        },
-        "description": f"Invoice sent: ${amount:,.2f} — {description}",
-    }]
+    events = [
+        {
+            "type": EventType.INVOICE_SENT.value,
+            "data": {
+                "amount": amount,
+                "payment_url": payment_url,
+                "description": description,
+            },
+            "description": f"Invoice sent: ${amount:,.2f} — {description}",
+        }
+    ]
 
     return {
         "messages_to_send": messages,
@@ -200,20 +219,23 @@ async def send_reminder(state: PaymentState) -> dict:
         return {}
 
     from app.integrations.stripe.payments import get_reminder_tone
+
     cadence = get_reminder_tone(days_overdue)
     tone = cadence["tone"]
 
     # Escalate to human if beyond SMS cadence
     if tone == "escalate":
-        events = [{
-            "type": EventType.HUMAN_ESCALATION.value,
-            "data": {
-                "escalation_type": "payment_overdue",
-                "amount_due": amount_due,
-                "days_overdue": days_overdue,
-            },
-            "description": f"Payment ${amount_due:,.2f} is {days_overdue} days overdue — escalated to human",
-        }]
+        events = [
+            {
+                "type": EventType.HUMAN_ESCALATION.value,
+                "data": {
+                    "escalation_type": "payment_overdue",
+                    "amount_due": amount_due,
+                    "days_overdue": days_overdue,
+                },
+                "description": f"Payment ${amount_due:,.2f} is {days_overdue} days overdue — escalated to human",
+            }
+        ]
         return {
             "events_to_emit": events,
             "actions": [{"action": "payment_escalated_to_human", "days_overdue": days_overdue}],
@@ -240,11 +262,13 @@ async def send_reminder(state: PaymentState) -> dict:
     }
     body = messages_by_tone.get(tone, messages_by_tone["friendly"])
 
-    events = [{
-        "type": EventType.PAYMENT_REMINDER_SENT.value,
-        "data": {"amount_due": amount_due, "days_overdue": days_overdue, "tone": tone},
-        "description": f"Payment reminder ({tone}): ${amount_due:,.2f}, {days_overdue} days overdue",
-    }]
+    events = [
+        {
+            "type": EventType.PAYMENT_REMINDER_SENT.value,
+            "data": {"amount_due": amount_due, "days_overdue": days_overdue, "tone": tone},
+            "description": f"Payment reminder ({tone}): ${amount_due:,.2f}, {days_overdue} days overdue",
+        }
+    ]
 
     return {
         "messages_to_send": [{"to": customer_phone, "body": body}],
@@ -285,27 +309,31 @@ async def generate_warranty(state: PaymentState) -> dict:
 
     warranty_text = response.content
 
-    events = [{
-        "type": EventType.WARRANTY_GENERATED.value,
-        "data": {
-            "warranty_text": warranty_text,
-            "property": state.get("property_address", ""),
-        },
-        "description": "Warranty document generated",
-    }]
+    events = [
+        {
+            "type": EventType.WARRANTY_GENERATED.value,
+            "data": {
+                "warranty_text": warranty_text,
+                "property": state.get("property_address", ""),
+            },
+            "description": "Warranty document generated",
+        }
+    ]
 
     messages = []
     if state.get("customer_phone"):
-        messages.append({
-            "to": state["customer_phone"],
-            "body": (
-                f"Your project is complete and paid in full!\n\n"
-                f"Your warranty details have been saved. We'll check in at "
-                f"6 and 12 months to ensure everything is holding up.\n\n"
-                f"If you notice any issues, just text us anytime.\n"
-                f"Thank you for choosing us!"
-            ),
-        })
+        messages.append(
+            {
+                "to": state["customer_phone"],
+                "body": (
+                    "Your project is complete and paid in full!\n\n"
+                    "Your warranty details have been saved. We'll check in at "
+                    "6 and 12 months to ensure everything is holding up.\n\n"
+                    "If you notice any issues, just text us anytime.\n"
+                    "Thank you for choosing us!"
+                ),
+            }
+        )
 
     # Schedule follow-up check-ins at 6 and 12 months
     followups = [
@@ -330,11 +358,13 @@ async def send_notifications(state: PaymentState) -> dict:
     from_phone = state.get("from_phone", "")
 
     for msg in state.get("messages_to_send", []):
-        await send_text_message.ainvoke({
-            "to_phone": msg["to"],
-            "body": msg["body"],
-            "from_phone": from_phone,
-        })
+        await send_text_message.ainvoke(
+            {
+                "to_phone": msg["to"],
+                "body": msg["body"],
+                "from_phone": from_phone,
+            }
+        )
 
     for event_data in state.get("events_to_emit", []):
         await emit_event(
@@ -355,6 +385,7 @@ async def send_notifications(state: PaymentState) -> dict:
 # Routing
 # ---------------------------------------------------------------------------
 
+
 def route_after_determine(state: PaymentState) -> str:
     payment = state.get("current_milestone_payment", {})
     ptype = payment.get("type", "none")
@@ -371,6 +402,7 @@ def route_after_determine(state: PaymentState) -> str:
 # ---------------------------------------------------------------------------
 # Graph
 # ---------------------------------------------------------------------------
+
 
 def build_payment_graph() -> StateGraph:
     """Build the Payment & Closure Agent graph.
@@ -392,12 +424,16 @@ def build_payment_graph() -> StateGraph:
     graph.set_entry_point("load_context")
     graph.add_edge("load_context", "determine")
 
-    graph.add_conditional_edges("determine", route_after_determine, {
-        "invoice": "invoice",
-        "reminder": "reminder",
-        "warranty": "warranty",
-        "notify": "notify",
-    })
+    graph.add_conditional_edges(
+        "determine",
+        route_after_determine,
+        {
+            "invoice": "invoice",
+            "reminder": "reminder",
+            "warranty": "warranty",
+            "notify": "notify",
+        },
+    )
 
     graph.add_edge("invoice", "notify")
     graph.add_edge("reminder", "notify")

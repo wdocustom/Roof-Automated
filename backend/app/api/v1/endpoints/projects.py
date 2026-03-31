@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func, select
 
 from app.core.database import get_tenant_session
-from app.middleware.tenant import AuthContext, get_auth_context, get_company_id
+from app.middleware.tenant import get_company_id
 from app.models.project import Project, ProjectStatus
 from app.schemas.project import (
     ProjectCreate,

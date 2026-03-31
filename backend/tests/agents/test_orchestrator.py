@@ -51,7 +51,10 @@ class TestOrchestratorRouting:
             mock_router.complete = AsyncMock(return_value=mock_response)
 
             state = _make_state(
-                trigger_event={"event_type": EventType.WEATHER_ALERT.value, "data": {"alert": "thunderstorm warning"}},
+                trigger_event={
+                    "event_type": EventType.WEATHER_ALERT.value,
+                    "data": {"alert": "thunderstorm warning"},
+                },
                 trigger_type=EventType.WEATHER_ALERT.value,
             )
 

@@ -5,18 +5,15 @@ generate accurate preliminary estimates.
 """
 
 from langchain_core.tools import tool
+from sqlalchemy import select
 
 from app.core.database import get_tenant_session
 from app.models.rate_card import (
     LaborRate,
     Material,
-    MaterialCategory,
     PermitFee,
-    RoofComplexity,
     WasteFactor,
 )
-
-from sqlalchemy import select
 
 
 @tool
@@ -72,8 +69,7 @@ async def lookup_labor_rates(
     """
     async with get_tenant_session(company_id) as session:
         result = await session.execute(
-            select(LaborRate)
-            .where(LaborRate.task_type == task_type, LaborRate.is_active.is_(True))
+            select(LaborRate).where(LaborRate.task_type == task_type, LaborRate.is_active.is_(True))
         )
         rates = result.scalars().all()
 

@@ -95,9 +95,7 @@ async def update_project_status(
         Dict with updated status.
     """
     async with get_tenant_session(company_id) as session:
-        result = await session.execute(
-            select(Project).where(Project.id == uuid.UUID(project_id))
-        )
+        result = await session.execute(select(Project).where(Project.id == uuid.UUID(project_id)))
         project = result.scalar_one_or_none()
         if not project:
             return {"error": "Project not found"}
@@ -128,9 +126,7 @@ async def update_project_estimate(
         Dict confirming the update.
     """
     async with get_tenant_session(company_id) as session:
-        result = await session.execute(
-            select(Project).where(Project.id == uuid.UUID(project_id))
-        )
+        result = await session.execute(select(Project).where(Project.id == uuid.UUID(project_id)))
         project = result.scalar_one_or_none()
         if not project:
             return {"error": "Project not found"}
@@ -165,9 +161,7 @@ async def get_project_details(
         Dict with all project fields.
     """
     async with get_tenant_session(company_id) as session:
-        result = await session.execute(
-            select(Project).where(Project.id == uuid.UUID(project_id))
-        )
+        result = await session.execute(select(Project).where(Project.id == uuid.UUID(project_id)))
         project = result.scalar_one_or_none()
         if not project:
             return {"error": "Project not found"}

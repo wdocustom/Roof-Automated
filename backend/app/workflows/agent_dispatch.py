@@ -14,16 +14,13 @@ workflow history for full visibility.
 
 from dataclasses import dataclass
 from datetime import timedelta
-from typing import Any
 
 from temporalio import activity, workflow
-
-from app.core.config import settings
-
 
 # ---------------------------------------------------------------------------
 # Input/Output
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class AgentDispatchInput:
@@ -55,6 +52,7 @@ class AgentResult:
 # Activities
 # ---------------------------------------------------------------------------
 
+
 @activity.defn
 async def determine_agent(input: AgentDispatchInput) -> str:
     """Determine which agent should handle this message.
@@ -65,16 +63,15 @@ async def determine_agent(input: AgentDispatchInput) -> str:
     """
     if not input.project_id:
         # Check if we can find an existing project by phone number
+        from sqlalchemy import select
+
         from app.core.database import get_tenant_session
         from app.models.project import Project, ProjectStatus
         from app.models.user import User
-        from sqlalchemy import select
 
         async with get_tenant_session(input.company_id) as session:
             # Find customer by phone
-            result = await session.execute(
-                select(User).where(User.phone == input.customer_phone)
-            )
+            result = await session.execute(select(User).where(User.phone == input.customer_phone))
             customer = result.scalar_one_or_none()
 
             if customer:
@@ -83,10 +80,12 @@ async def determine_agent(input: AgentDispatchInput) -> str:
                     select(Project)
                     .where(
                         Project.customer_id == customer.id,
-                        Project.status.notin_([
-                            ProjectStatus.PAID,
-                            ProjectStatus.CANCELLED,
-                        ]),
+                        Project.status.notin_(
+                            [
+                                ProjectStatus.PAID,
+                                ProjectStatus.CANCELLED,
+                            ]
+                        ),
                     )
                     .order_by(Project.created_at.desc())
                     .limit(1)
@@ -225,6 +224,7 @@ async def log_agent_action(
 # ---------------------------------------------------------------------------
 # Workflow
 # ---------------------------------------------------------------------------
+
 
 @workflow.defn
 class AgentDispatchWorkflow:

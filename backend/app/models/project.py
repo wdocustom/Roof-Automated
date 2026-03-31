@@ -18,7 +18,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.models.base import BaseModel, TenantMixin
 
 
-class ProjectStatus(str, enum.Enum):
+class ProjectStatus(enum.StrEnum):
     LEAD = "lead"
     ONBOARDED = "onboarded"
     ESTIMATED = "estimated"
@@ -33,7 +33,7 @@ class ProjectStatus(str, enum.Enum):
     CANCELLED = "cancelled"
 
 
-class ProjectType(str, enum.Enum):
+class ProjectType(enum.StrEnum):
     ROOF_REPLACEMENT = "roof_replacement"
     ROOF_REPAIR = "roof_repair"
     SIDING_INSTALL = "siding_install"
@@ -112,7 +112,7 @@ class MilestoneTemplate(BaseModel, TenantMixin):
     project_type: Mapped[ProjectType | None] = mapped_column(Enum(ProjectType))
 
 
-class MilestoneStatus(str, enum.Enum):
+class MilestoneStatus(enum.StrEnum):
     PENDING = "pending"
     IN_PROGRESS = "in_progress"
     AWAITING_QC = "awaiting_qc"

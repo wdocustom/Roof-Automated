@@ -15,7 +15,6 @@ from dataclasses import dataclass, field
 
 from langchain_core.tools import tool
 
-from app.integrations.eagleview.client import PropertyMeasurement
 from app.integrations.llm.router import LLMRequest, ModelTier, llm_router
 
 
@@ -167,7 +166,11 @@ async def generate_qc_summary(
         }
 
     # Aggregate scores
-    scores = [a.get("spec_match_score", 0) for a in photo_analyses if isinstance(a.get("spec_match_score"), (int, float))]
+    scores = [
+        a.get("spec_match_score", 0)
+        for a in photo_analyses
+        if isinstance(a.get("spec_match_score"), (int, float))
+    ]
     avg_score = sum(scores) / len(scores) if scores else 0.0
 
     all_issues = []

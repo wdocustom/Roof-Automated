@@ -10,13 +10,13 @@ from sqlalchemy.orm import Mapped, mapped_column
 from app.models.base import BaseModel, TenantMixin
 
 
-class ConsentStatus(str, enum.Enum):
+class ConsentStatus(enum.StrEnum):
     OPTED_IN = "opted_in"
     OPTED_OUT = "opted_out"
     PENDING = "pending"
 
 
-class ConsentSource(str, enum.Enum):
+class ConsentSource(enum.StrEnum):
     WEB_FORM = "web_form"
     TEXT_KEYWORD = "text_keyword"  # Customer texted in first
     VERBAL = "verbal"  # Logged by sales rep

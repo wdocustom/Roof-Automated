@@ -23,17 +23,17 @@ Architecture:
 from __future__ import annotations
 
 import operator
-from typing import Annotated, Any, TypedDict
+from typing import Annotated, TypedDict
 
 from langgraph.graph import END, StateGraph
 
 from app.agents.events import Event, EventType, emit_event, get_project_events
 from app.integrations.llm.router import LLMRequest, ModelTier, llm_router
 
-
 # ---------------------------------------------------------------------------
 # Orchestrator State
 # ---------------------------------------------------------------------------
+
 
 class OrchestratorState(TypedDict):
     """High-level project state managed by the orchestrator."""
@@ -69,14 +69,17 @@ class OrchestratorState(TypedDict):
 # Nodes
 # ---------------------------------------------------------------------------
 
+
 async def load_project_state(state: OrchestratorState) -> dict:
     """Load current project state and recent events from DB."""
     from app.agents.tools.project_tools import get_project_details
 
-    project = await get_project_details.ainvoke({
-        "company_id": state["company_id"],
-        "project_id": state["project_id"],
-    })
+    project = await get_project_details.ainvoke(
+        {
+            "company_id": state["company_id"],
+            "project_id": state["project_id"],
+        }
+    )
 
     events = await get_project_events(
         company_id=state["company_id"],
@@ -85,10 +88,12 @@ async def load_project_state(state: OrchestratorState) -> dict:
     )
 
     # Load milestones
+    import uuid
+
+    from sqlalchemy import select
+
     from app.core.database import get_tenant_session
     from app.models.project import ProjectMilestone
-    from sqlalchemy import select
-    import uuid
 
     milestones = []
     async with get_tenant_session(state["company_id"]) as session:
@@ -98,13 +103,15 @@ async def load_project_state(state: OrchestratorState) -> dict:
             .order_by(ProjectMilestone.sort_order)
         )
         for m in result.scalars().all():
-            milestones.append({
-                "id": str(m.id),
-                "name": m.name,
-                "status": m.status.value,
-                "requires_photo": m.requires_photo,
-                "requires_human_signoff": m.requires_human_signoff,
-            })
+            milestones.append(
+                {
+                    "id": str(m.id),
+                    "name": m.name,
+                    "status": m.status.value,
+                    "requires_photo": m.requires_photo,
+                    "requires_human_signoff": m.requires_human_signoff,
+                }
+            )
 
     return {
         "project_status": project.get("status", "unknown"),
@@ -214,7 +221,9 @@ async def dispatch_to_agent(state: OrchestratorState) -> dict:
     await emit_event(
         company_id=state["company_id"],
         event=Event(
-            event_type=EventType.CREW_DISPATCHED if agent == "execution" else EventType.CUSTOMER_MESSAGE,
+            event_type=EventType.CREW_DISPATCHED
+            if agent == "execution"
+            else EventType.CUSTOMER_MESSAGE,
             agent_name="orchestrator",
             project_id=state["project_id"],
             data={
@@ -234,10 +243,12 @@ async def dispatch_to_agent(state: OrchestratorState) -> dict:
             "company_id": state["company_id"],
             "trigger": trigger,
         },
-        "actions_taken": [{
-            "action": f"dispatch_to_{agent}",
-            "reasoning": state["decision_reasoning"],
-        }],
+        "actions_taken": [
+            {
+                "action": f"dispatch_to_{agent}",
+                "reasoning": state["decision_reasoning"],
+            }
+        ],
     }
 
 
@@ -268,6 +279,7 @@ async def handle_escalation(state: OrchestratorState) -> dict:
 # Routing
 # ---------------------------------------------------------------------------
 
+
 def route_after_decision(state: OrchestratorState) -> str:
     if state.get("needs_human_escalation"):
         return "escalate"
@@ -277,6 +289,7 @@ def route_after_decision(state: OrchestratorState) -> str:
 # ---------------------------------------------------------------------------
 # Build Graph
 # ---------------------------------------------------------------------------
+
 
 def build_orchestrator_graph() -> StateGraph:
     """Build the Orchestrator decision graph.
@@ -296,10 +309,14 @@ def build_orchestrator_graph() -> StateGraph:
     graph.set_entry_point("load_state")
     graph.add_edge("load_state", "decide")
 
-    graph.add_conditional_edges("decide", route_after_decision, {
-        "dispatch": "dispatch",
-        "escalate": "escalate",
-    })
+    graph.add_conditional_edges(
+        "decide",
+        route_after_decision,
+        {
+            "dispatch": "dispatch",
+            "escalate": "escalate",
+        },
+    )
 
     graph.add_edge("dispatch", END)
     graph.add_edge("escalate", END)

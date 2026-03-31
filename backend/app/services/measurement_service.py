@@ -8,9 +8,8 @@ When a measurement report arrives (via webhook or direct fetch), this service:
 
 import uuid
 
-from sqlalchemy import select, update
-
 import structlog
+from sqlalchemy import select, update
 
 from app.core.database import get_tenant_session
 from app.integrations.eagleview.client import PropertyMeasurement
@@ -47,9 +46,7 @@ async def update_project_measurements(
 
     async with get_tenant_session(company_id) as session:
         await session.execute(
-            update(Project)
-            .where(Project.id == uuid.UUID(project_id))
-            .values(**updates)
+            update(Project).where(Project.id == uuid.UUID(project_id)).values(**updates)
         )
         await session.flush()
 
@@ -84,9 +81,7 @@ async def get_measurement_for_project(
     )
 
     async with get_tenant_session(company_id) as session:
-        result = await session.execute(
-            select(Project).where(Project.id == uuid.UUID(project_id))
-        )
+        result = await session.execute(select(Project).where(Project.id == uuid.UUID(project_id)))
         project = result.scalar_one_or_none()
         if not project:
             return None
@@ -94,9 +89,7 @@ async def get_measurement_for_project(
         # If we have real measurement data, fetch via service
         if project.eagleview_report_id:
             try:
-                return await measurement_service.get_best_measurement(
-                    project.property_address
-                )
+                return await measurement_service.get_best_measurement(project.property_address)
             except Exception as e:
                 logger.warning(
                     "measurement_fetch_failed",

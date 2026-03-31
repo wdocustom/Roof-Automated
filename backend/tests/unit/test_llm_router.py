@@ -25,7 +25,9 @@ class TestLLMRouter:
         mock_response.choices = [MagicMock(message=MagicMock(content="Hello!"))]
         mock_response.usage = MagicMock(prompt_tokens=10, completion_tokens=5)
 
-        with patch("app.integrations.llm.router.litellm.acompletion", new_callable=AsyncMock) as mock:
+        with patch(
+            "app.integrations.llm.router.litellm.acompletion", new_callable=AsyncMock
+        ) as mock:
             mock.return_value = mock_response
 
             result = await router.complete(
@@ -56,7 +58,9 @@ class TestLLMRouter:
                 raise Exception("Primary model down")
             return mock_response
 
-        with patch("app.integrations.llm.router.litellm.acompletion", new_callable=AsyncMock) as mock:
+        with patch(
+            "app.integrations.llm.router.litellm.acompletion", new_callable=AsyncMock
+        ) as mock:
             mock.side_effect = side_effect
 
             result = await router.complete(
@@ -72,7 +76,9 @@ class TestLLMRouter:
     @pytest.mark.asyncio
     async def test_all_models_fail_raises(self, router):
         """Test that RuntimeError is raised when all models fail."""
-        with patch("app.integrations.llm.router.litellm.acompletion", new_callable=AsyncMock) as mock:
+        with patch(
+            "app.integrations.llm.router.litellm.acompletion", new_callable=AsyncMock
+        ) as mock:
             mock.side_effect = Exception("All down")
 
             with pytest.raises(RuntimeError, match="All models failed"):
@@ -90,7 +96,9 @@ class TestLLMRouter:
         mock_response.choices = [MagicMock(message=MagicMock(content="lead_inquiry"))]
         mock_response.usage = MagicMock(prompt_tokens=50, completion_tokens=3)
 
-        with patch("app.integrations.llm.router.litellm.acompletion", new_callable=AsyncMock) as mock:
+        with patch(
+            "app.integrations.llm.router.litellm.acompletion", new_callable=AsyncMock
+        ) as mock:
             mock.return_value = mock_response
 
             result = await router.classify(

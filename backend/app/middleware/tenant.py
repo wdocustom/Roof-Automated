@@ -8,11 +8,11 @@ Every authenticated request extracts the user/org context and sets it
 as the PostgreSQL session variable for Row-Level Security filtering.
 """
 
+import httpx
 from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError, jwt
 from pydantic import BaseModel
-import httpx
 
 from app.core.config import settings
 

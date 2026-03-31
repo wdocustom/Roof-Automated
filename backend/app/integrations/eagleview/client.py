@@ -14,8 +14,8 @@ Hover follows a similar pattern with its own API format.
 """
 
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from enum import Enum
+from datetime import UTC, datetime
+from enum import StrEnum
 
 import httpx
 import structlog
@@ -29,7 +29,8 @@ logger = structlog.get_logger()
 # Standardized measurement data
 # ---------------------------------------------------------------------------
 
-class MeasurementSource(str, Enum):
+
+class MeasurementSource(StrEnum):
     MANUAL = "manual"
     EAGLEVIEW = "eagleview"
     HOVER = "hover"
@@ -87,7 +88,7 @@ class PropertyMeasurement:
     raw_data: dict | None = None
 
 
-class MeasurementOrderStatus(str, Enum):
+class MeasurementOrderStatus(StrEnum):
     PENDING = "pending"
     PROCESSING = "processing"
     COMPLETED = "completed"
@@ -112,6 +113,7 @@ class MeasurementOrder:
 # Abstract provider interface
 # ---------------------------------------------------------------------------
 
+
 class PropertyMeasurementProvider:
     """Base interface for measurement providers."""
 
@@ -131,6 +133,7 @@ class PropertyMeasurementProvider:
 # ---------------------------------------------------------------------------
 # EagleView implementation
 # ---------------------------------------------------------------------------
+
 
 class EagleViewProvider(PropertyMeasurementProvider):
     """EagleView API integration for aerial property measurements.
@@ -155,7 +158,7 @@ class EagleViewProvider(PropertyMeasurementProvider):
 
     async def _get_auth_token(self) -> str:
         """Get or refresh OAuth token."""
-        if self._token and self._token_expires and datetime.now(timezone.utc) < self._token_expires:
+        if self._token and self._token_expires and datetime.now(UTC) < self._token_expires:
             return self._token
 
         async with httpx.AsyncClient() as client:
@@ -173,8 +176,8 @@ class EagleViewProvider(PropertyMeasurementProvider):
 
         self._token = data["access_token"]
         # Expire 5 minutes early for safety
-        expires_in = data.get("expires_in", 3600) - 300
-        self._token_expires = datetime.now(timezone.utc)
+        data.get("expires_in", 3600) - 300
+        self._token_expires = datetime.now(UTC)
         return self._token
 
     async def order_report(self, address: str, project_id: str = "") -> MeasurementOrder:
@@ -219,7 +222,7 @@ class EagleViewProvider(PropertyMeasurementProvider):
             address=address,
             status=MeasurementOrderStatus.PROCESSING,
             project_id=project_id,
-            created_at=datetime.now(timezone.utc).isoformat(),
+            created_at=datetime.now(UTC).isoformat(),
         )
 
     async def check_order_status(self, order_id: str) -> MeasurementOrder:
@@ -293,12 +296,14 @@ class EagleViewProvider(PropertyMeasurementProvider):
 
         facets = []
         for f in roof.get("facets", []):
-            facets.append(RoofFacet(
-                facet_id=str(f.get("id", "")),
-                area_sqft=f.get("area_sqft", 0),
-                pitch=f.get("pitch", ""),
-                pitch_degrees=f.get("pitch_degrees", 0),
-            ))
+            facets.append(
+                RoofFacet(
+                    facet_id=str(f.get("id", "")),
+                    area_sqft=f.get("area_sqft", 0),
+                    pitch=f.get("pitch", ""),
+                    pitch_degrees=f.get("pitch_degrees", 0),
+                )
+            )
 
         total_sqft = roof.get("total_area_sqft", 0)
 
@@ -334,6 +339,7 @@ class EagleViewProvider(PropertyMeasurementProvider):
 # ---------------------------------------------------------------------------
 # Hover implementation
 # ---------------------------------------------------------------------------
+
 
 class HoverProvider(PropertyMeasurementProvider):
     """Hover API integration — 3D property models from smartphone photos.
@@ -378,7 +384,7 @@ class HoverProvider(PropertyMeasurementProvider):
             address=address,
             status=MeasurementOrderStatus.PENDING,
             project_id=project_id,
-            created_at=datetime.now(timezone.utc).isoformat(),
+            created_at=datetime.now(UTC).isoformat(),
         )
 
     async def parse_report(self, report_data: dict) -> PropertyMeasurement:
@@ -391,7 +397,8 @@ class HoverProvider(PropertyMeasurementProvider):
             total_roof_sqft=measurements.get("roof_area_sqft"),
             total_roof_squares=(
                 round(measurements["roof_area_sqft"] / 100, 1)
-                if measurements.get("roof_area_sqft") else None
+                if measurements.get("roof_area_sqft")
+                else None
             ),
             predominant_pitch=measurements.get("roof_pitch"),
             siding_sqft=measurements.get("exterior_wall_area_sqft"),
@@ -410,6 +417,7 @@ class HoverProvider(PropertyMeasurementProvider):
 # ---------------------------------------------------------------------------
 # Measurement service — unified access with provider selection
 # ---------------------------------------------------------------------------
+
 
 class MeasurementService:
     """Unified service that selects the best provider and manages orders."""

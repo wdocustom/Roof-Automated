@@ -23,10 +23,10 @@ from langgraph.graph import END, StateGraph
 from app.agents.events import Event, EventType, emit_event
 from app.integrations.llm.router import LLMRequest, ModelTier, llm_router
 
-
 # ---------------------------------------------------------------------------
 # State
 # ---------------------------------------------------------------------------
+
 
 class QCState(TypedDict):
     """State for the Progress & QC Agent."""
@@ -71,11 +71,13 @@ class QCState(TypedDict):
 # Nodes
 # ---------------------------------------------------------------------------
 
+
 async def load_milestone_context(state: QCState) -> dict:
     """Load the milestone details and contract specs."""
+    from sqlalchemy import select
+
     from app.core.database import get_tenant_session
     from app.models.project import Project, ProjectMilestone
-    from sqlalchemy import select
 
     milestone_id = state.get("milestone_id", "")
     if not milestone_id:
@@ -91,9 +93,7 @@ async def load_milestone_context(state: QCState) -> dict:
             return {"milestone_name": "Unknown", "expected_work": ""}
 
         # Load project for contract specs
-        result = await session.execute(
-            select(Project).where(Project.id == milestone.project_id)
-        )
+        result = await session.execute(select(Project).where(Project.id == milestone.project_id))
         project = result.scalar_one_or_none()
 
         expected = _get_expected_work(milestone.name, project)
@@ -120,12 +120,14 @@ async def analyze_photos(state: QCState) -> dict:
 
     analyses = []
     for url in photos[:5]:  # Cap at 5 photos per milestone
-        analysis = await analyze_progress_photo.ainvoke({
-            "image_url": url,
-            "milestone_name": state.get("milestone_name", ""),
-            "expected_work": state.get("expected_work", ""),
-            "tenant_id": state.get("company_id"),
-        })
+        analysis = await analyze_progress_photo.ainvoke(
+            {
+                "image_url": url,
+                "milestone_name": state.get("milestone_name", ""),
+                "expected_work": state.get("expected_work", ""),
+                "tenant_id": state.get("company_id"),
+            }
+        )
         analyses.append(analysis)
 
     return {"photo_analyses": analyses}
@@ -187,7 +189,11 @@ async def assess_quality(state: QCState) -> dict:
     )
 
     parsed = _parse_response(response.content)
-    issues = [i.strip() for i in parsed.get("issues", "none").split(",") if i.strip() and i.strip().lower() != "none"]
+    issues = [
+        i.strip()
+        for i in parsed.get("issues", "none").split(",")
+        if i.strip() and i.strip().lower() != "none"
+    ]
 
     return {
         "qc_passed": parsed.get("qc_passed", "no").lower() == "yes",
@@ -216,56 +222,70 @@ async def handle_qc_result(state: QCState) -> dict:
 
     if recommendation == "approve" and not requires_human:
         # Auto-approve — update milestone status
-        events.append({
-            "type": EventType.MILESTONE_QC_PASSED.value,
-            "data": state.get("qc_report", {}),
-            "description": f"Milestone '{state.get('milestone_name', '')}' QC passed (auto-approved)",
-        })
+        events.append(
+            {
+                "type": EventType.MILESTONE_QC_PASSED.value,
+                "data": state.get("qc_report", {}),
+                "description": f"Milestone '{state.get('milestone_name', '')}' QC passed (auto-approved)",
+            }
+        )
 
         # Notify customer
         if state.get("customer_phone"):
-            messages.append({
-                "to": state["customer_phone"],
-                "body": f"Great news! The {state.get('milestone_name', 'current milestone')} has passed quality inspection. Work is progressing well!",
-            })
+            messages.append(
+                {
+                    "to": state["customer_phone"],
+                    "body": f"Great news! The {state.get('milestone_name', 'current milestone')} has passed quality inspection. Work is progressing well!",
+                }
+            )
 
     elif recommendation == "reject":
         # QC failed — notify crew and flag
-        events.append({
-            "type": EventType.MILESTONE_QC_FAILED.value,
-            "data": {**state.get("qc_report", {}), "issues": state.get("issues_found", [])},
-            "description": f"Milestone '{state.get('milestone_name', '')}' QC FAILED: {', '.join(state.get('issues_found', []))}",
-        })
+        events.append(
+            {
+                "type": EventType.MILESTONE_QC_FAILED.value,
+                "data": {**state.get("qc_report", {}), "issues": state.get("issues_found", [])},
+                "description": f"Milestone '{state.get('milestone_name', '')}' QC FAILED: {', '.join(state.get('issues_found', []))}",
+            }
+        )
 
         if state.get("crew_lead_phone"):
             issues_text = "\n".join(f"- {i}" for i in state.get("issues_found", []))
-            messages.append({
-                "to": state["crew_lead_phone"],
-                "body": f"QC Review — issues found on {state.get('milestone_name', '')}:\n{issues_text}\nPlease address and upload new photos.",
-            })
+            messages.append(
+                {
+                    "to": state["crew_lead_phone"],
+                    "body": f"QC Review — issues found on {state.get('milestone_name', '')}:\n{issues_text}\nPlease address and upload new photos.",
+                }
+            )
 
     else:
         # Flag for human review (default conservative path)
-        events.append({
-            "type": EventType.MILESTONE_HUMAN_APPROVAL_REQUESTED.value,
-            "data": state.get("qc_report", {}),
-            "description": f"Milestone '{state.get('milestone_name', '')}' ready for human review",
-        })
+        events.append(
+            {
+                "type": EventType.MILESTONE_HUMAN_APPROVAL_REQUESTED.value,
+                "data": state.get("qc_report", {}),
+                "description": f"Milestone '{state.get('milestone_name', '')}' ready for human review",
+            }
+        )
 
         if state.get("owner_phone"):
-            messages.append({
-                "to": state["owner_phone"],
-                "body": (
-                    f"QC Review Needed: {state.get('milestone_name', '')}\n"
-                    f"Confidence: {state.get('confidence', 0):.0%}\n"
-                    f"Reply APPROVE or REJECT"
-                ),
-            })
+            messages.append(
+                {
+                    "to": state["owner_phone"],
+                    "body": (
+                        f"QC Review Needed: {state.get('milestone_name', '')}\n"
+                        f"Confidence: {state.get('confidence', 0):.0%}\n"
+                        f"Reply APPROVE or REJECT"
+                    ),
+                }
+            )
 
     return {
         "events_to_emit": events,
         "messages_to_send": messages,
-        "actions": [{"action": f"qc_{recommendation}", "milestone": state.get("milestone_name", "")}],
+        "actions": [
+            {"action": f"qc_{recommendation}", "milestone": state.get("milestone_name", "")}
+        ],
     }
 
 
@@ -276,11 +296,13 @@ async def send_notifications(state: QCState) -> dict:
     from_phone = state.get("from_phone", "")
 
     for msg in state.get("messages_to_send", []):
-        await send_text_message.ainvoke({
-            "to_phone": msg["to"],
-            "body": msg["body"],
-            "from_phone": from_phone,
-        })
+        await send_text_message.ainvoke(
+            {
+                "to_phone": msg["to"],
+                "body": msg["body"],
+                "from_phone": from_phone,
+            }
+        )
 
     for event_data in state.get("events_to_emit", []):
         await emit_event(
@@ -300,6 +322,7 @@ async def send_notifications(state: QCState) -> dict:
 # ---------------------------------------------------------------------------
 # Graph
 # ---------------------------------------------------------------------------
+
 
 def build_qc_graph() -> StateGraph:
     """Build the Progress & QC Agent graph.
@@ -331,6 +354,7 @@ qc_graph = build_qc_graph().compile()
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _get_expected_work(milestone_name: str, project) -> str:
     """Map milestone name to expected work description for QC comparison."""

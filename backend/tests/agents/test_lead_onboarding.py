@@ -6,7 +6,7 @@ Strategy:
 - Cost regression: Track token counts
 """
 
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
@@ -16,14 +16,13 @@ from app.agents.graphs.lead_onboarding import (
     _parse_agent_response,
     build_lead_onboarding_graph,
     classify_intent,
-    qualify_lead,
 )
 from app.integrations.llm.router import LLMResponse
-
 
 # ---------------------------------------------------------------------------
 # Unit Tests
 # ---------------------------------------------------------------------------
+
 
 class TestParseAgentResponse:
     def test_parses_structured_response(self):
@@ -170,7 +169,15 @@ class TestGraphConstruction:
     def test_graph_has_expected_nodes(self):
         graph = build_lead_onboarding_graph()
         node_names = set(graph.nodes.keys())
-        expected = {"classify", "qualify", "analyze_photos", "estimate", "check_review", "respond", "escalate"}
+        expected = {
+            "classify",
+            "qualify",
+            "analyze_photos",
+            "estimate",
+            "check_review",
+            "respond",
+            "escalate",
+        }
         assert expected.issubset(node_names)
 
 
@@ -267,7 +274,9 @@ class TestEvalScenarios:
                 "from_phone": "+15559876543",
                 "messages": [],
                 "current_input": scenario["input"],
-                "media_urls": ["https://example.com/photo.jpg"] if scenario.get("has_media") else [],
+                "media_urls": ["https://example.com/photo.jpg"]
+                if scenario.get("has_media")
+                else [],
                 "stage": "new",
                 "intent": "",
                 "project_type": "",

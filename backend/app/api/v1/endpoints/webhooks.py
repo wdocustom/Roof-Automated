@@ -5,9 +5,6 @@ and dispatch to Temporal workflows for async processing. The webhook
 MUST respond within 15 seconds — all heavy processing happens in Temporal.
 """
 
-import hashlib
-import hmac
-
 from fastapi import APIRouter, Form, HTTPException, Request, status
 from twilio.request_validator import RequestValidator
 

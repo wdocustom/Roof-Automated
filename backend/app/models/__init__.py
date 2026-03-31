@@ -1,19 +1,19 @@
 """SQLAlchemy models for the Roof Automated platform."""
 
+from app.models.audit import AuditLog
 from app.models.base import Base
 from app.models.company import Company
-from app.models.user import User
-from app.models.project import Project, ProjectMilestone, MilestoneTemplate
-from app.models.message import Message, MessageMedia
-from app.models.rate_card import (
-    Material,
-    LaborRate,
-    PermitFee,
-    WasteFactor,
-    RateCardVersion,
-)
 from app.models.consent import SMSConsent
-from app.models.audit import AuditLog
+from app.models.message import Message, MessageMedia
+from app.models.project import MilestoneTemplate, Project, ProjectMilestone
+from app.models.rate_card import (
+    LaborRate,
+    Material,
+    PermitFee,
+    RateCardVersion,
+    WasteFactor,
+)
+from app.models.user import User
 
 __all__ = [
     "Base",

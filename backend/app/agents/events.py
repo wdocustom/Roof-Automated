@@ -12,9 +12,8 @@ Pattern: Event Sourcing. Project state is derived from the event stream.
 
 import uuid
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from enum import Enum
-from typing import Any
+from datetime import UTC, datetime
+from enum import StrEnum
 
 from sqlalchemy import DateTime, String, Text, select
 from sqlalchemy.dialects.postgresql import JSONB, UUID
@@ -22,12 +21,12 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base, TenantMixin
 
-
 # ---------------------------------------------------------------------------
 # Event Types
 # ---------------------------------------------------------------------------
 
-class EventType(str, Enum):
+
+class EventType(StrEnum):
     # Lead & Onboarding
     LEAD_CREATED = "lead_created"
     LEAD_QUALIFIED = "lead_qualified"
@@ -89,27 +88,27 @@ class EventType(str, Enum):
 # Event Model (Database)
 # ---------------------------------------------------------------------------
 
+
 class ProjectEvent(Base, TenantMixin):
     """Immutable event in a project's event stream."""
 
     __tablename__ = "project_events"
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
-    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     project_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False, index=True)
     event_type: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
     agent_name: Mapped[str] = mapped_column(String(100), nullable=False)
     data: Mapped[dict | None] = mapped_column(JSONB)
     description: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
+        DateTime(timezone=True), default=lambda: datetime.now(UTC)
     )
 
 
 # ---------------------------------------------------------------------------
 # Event Helpers
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class Event:

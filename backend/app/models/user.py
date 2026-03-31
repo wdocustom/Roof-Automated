@@ -8,7 +8,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 from app.models.base import BaseModel, TenantMixin
 
 
-class UserRole(str, enum.Enum):
+class UserRole(enum.StrEnum):
     OWNER = "owner"
     SALES_MANAGER = "sales_manager"
     CREW_LEAD = "crew_lead"

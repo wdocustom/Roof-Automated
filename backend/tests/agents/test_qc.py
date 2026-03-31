@@ -1,7 +1,5 @@
 """Tests for the Progress & QC Agent."""
 
-from unittest.mock import AsyncMock, patch
-
 import pytest
 
 from app.agents.graphs.progress_qc import (
@@ -9,7 +7,6 @@ from app.agents.graphs.progress_qc import (
     _get_expected_work,
     build_qc_graph,
 )
-from app.integrations.llm.router import LLMResponse
 
 
 class TestExpectedWork:

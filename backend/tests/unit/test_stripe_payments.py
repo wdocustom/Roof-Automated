@@ -21,21 +21,27 @@ class TestPaymentSchedule:
         assert schedule[0]["percentage"] == 100
 
     def test_two_milestones(self):
-        schedule = build_payment_schedule(10000, [
-            {"name": "Deposit"},
-            {"name": "Final"},
-        ])
+        schedule = build_payment_schedule(
+            10000,
+            [
+                {"name": "Deposit"},
+                {"name": "Final"},
+            ],
+        )
         assert len(schedule) == 2
         assert schedule[0]["percentage"] == 60
         assert schedule[1]["percentage"] == 40
         assert schedule[0]["amount"] + schedule[1]["amount"] == 10000
 
     def test_three_milestones(self):
-        schedule = build_payment_schedule(10000, [
-            {"name": "Deposit"},
-            {"name": "Shingles Installed"},
-            {"name": "Final Walkthrough"},
-        ])
+        schedule = build_payment_schedule(
+            10000,
+            [
+                {"name": "Deposit"},
+                {"name": "Shingles Installed"},
+                {"name": "Final Walkthrough"},
+            ],
+        )
         assert len(schedule) == 3
         assert schedule[0]["percentage"] == 50  # Deposit
         assert schedule[2]["percentage"] == 10  # Final
@@ -43,12 +49,15 @@ class TestPaymentSchedule:
         assert total == 10000
 
     def test_four_milestones(self):
-        schedule = build_payment_schedule(20000, [
-            {"name": "Deposit"},
-            {"name": "Tear-off Complete"},
-            {"name": "Shingles Installed"},
-            {"name": "Final"},
-        ])
+        schedule = build_payment_schedule(
+            20000,
+            [
+                {"name": "Deposit"},
+                {"name": "Tear-off Complete"},
+                {"name": "Shingles Installed"},
+                {"name": "Final"},
+            ],
+        )
         assert len(schedule) == 4
         assert schedule[0]["percentage"] == 50
         assert schedule[-1]["percentage"] == 10
@@ -100,8 +109,9 @@ class TestReminderCadence:
 class TestStripeWebhookHandlers:
     @pytest.mark.asyncio
     async def test_payment_succeeded_handler(self):
-        from app.integrations.stripe.webhooks import handle_payment_succeeded
         from unittest.mock import AsyncMock, patch
+
+        from app.integrations.stripe.webhooks import handle_payment_succeeded
 
         with patch("app.agents.events.emit_event", new_callable=AsyncMock):
             result = await handle_payment_succeeded(
@@ -114,14 +124,18 @@ class TestStripeWebhookHandlers:
 
     @pytest.mark.asyncio
     async def test_payment_failed_handler(self):
-        from app.integrations.stripe.webhooks import handle_payment_failed
         from unittest.mock import AsyncMock, patch
+
+        from app.integrations.stripe.webhooks import handle_payment_failed
 
         with patch("app.agents.events.emit_event", new_callable=AsyncMock):
             result = await handle_payment_failed(
                 {
                     "amount": 500000,
-                    "last_payment_error": {"code": "card_declined", "message": "Insufficient funds"},
+                    "last_payment_error": {
+                        "code": "card_declined",
+                        "message": "Insufficient funds",
+                    },
                 },
                 company_id="co-1",
                 project_id="p-1",
@@ -131,8 +145,9 @@ class TestStripeWebhookHandlers:
 
     @pytest.mark.asyncio
     async def test_dispute_always_escalates(self):
-        from app.integrations.stripe.webhooks import handle_dispute_created
         from unittest.mock import AsyncMock, patch
+
+        from app.integrations.stripe.webhooks import handle_dispute_created
 
         with patch("app.agents.events.emit_event", new_callable=AsyncMock) as mock_emit:
             result = await handle_dispute_created(

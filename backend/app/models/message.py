@@ -10,19 +10,19 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.models.base import BaseModel, TenantMixin
 
 
-class MessageDirection(str, enum.Enum):
+class MessageDirection(enum.StrEnum):
     INBOUND = "inbound"
     OUTBOUND = "outbound"
 
 
-class MessageChannel(str, enum.Enum):
+class MessageChannel(enum.StrEnum):
     SMS = "sms"
     MMS = "mms"
     RCS = "rcs"
     WHATSAPP = "whatsapp"
 
 
-class MessageSenderType(str, enum.Enum):
+class MessageSenderType(enum.StrEnum):
     CUSTOMER = "customer"
     AGENT = "agent"  # AI agent
     CREW = "crew"

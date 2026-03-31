@@ -13,7 +13,6 @@ Key capabilities:
 
 from langchain_core.tools import tool
 
-from app.integrations.eagleview.client import PropertyMeasurement
 from app.integrations.llm.router import LLMRequest, ModelTier, llm_router
 
 
@@ -125,8 +124,14 @@ async def generate_scope_preview(
                     "role": "user",
                     "content": (
                         f"Project: {project_type.replace('_', ' ').title()}\n"
-                        f"Scope items:\n" + "\n".join(f"  - {s}" for s in scope_items) + "\n"
-                        + (f"Estimate range: ${estimate_low:,.0f} - ${estimate_high:,.0f}" if estimate_low else "")
+                        f"Scope items:\n"
+                        + "\n".join(f"  - {s}" for s in scope_items)
+                        + "\n"
+                        + (
+                            f"Estimate range: ${estimate_low:,.0f} - ${estimate_high:,.0f}"
+                            if estimate_low
+                            else ""
+                        )
                     ),
                 },
             ],
@@ -146,9 +151,7 @@ async def generate_scope_preview(
     }
 
 
-def _format_preview_sms(
-    measurement: dict, project_type: str, summary: str
-) -> str:
+def _format_preview_sms(measurement: dict, project_type: str, summary: str) -> str:
     """Format a property preview for SMS delivery."""
     lines = [f"Your {project_type.replace('_', ' ').title()} Project"]
     lines.append("")
@@ -180,17 +183,11 @@ def _build_scope_items(measurement: dict, project_type: str) -> list[str]:
         items.append("Install new architectural shingles")
 
         if measurement.get("ridge_length_ft"):
-            items.append(
-                f"Install ridge vent (~{measurement['ridge_length_ft']:.0f} ft)"
-            )
+            items.append(f"Install ridge vent (~{measurement['ridge_length_ft']:.0f} ft)")
         if measurement.get("flashing_length_ft"):
-            items.append(
-                f"Install/replace flashing (~{measurement['flashing_length_ft']:.0f} ft)"
-            )
+            items.append(f"Install/replace flashing (~{measurement['flashing_length_ft']:.0f} ft)")
         if measurement.get("drip_edge_length_ft"):
-            items.append(
-                f"Install drip edge (~{measurement['drip_edge_length_ft']:.0f} ft)"
-            )
+            items.append(f"Install drip edge (~{measurement['drip_edge_length_ft']:.0f} ft)")
 
         items.append("Clean up all debris and magnetic nail sweep")
         items.append("Final inspection and walkthrough")

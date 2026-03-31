@@ -12,16 +12,17 @@ The FastAPI middleware sets this session variable from the Clerk JWT org_id
 on every request. This is the foundation of our multi-tenant security model.
 """
 
-from typing import Sequence, Union
+from collections.abc import Sequence
+
+import sqlalchemy as sa
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 
 from alembic import op
-import sqlalchemy as sa
-from sqlalchemy.dialects.postgresql import UUID, JSONB
 
 revision: str = "001"
-down_revision: Union[str, None] = None
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+down_revision: str | None = None
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 # All tenant-scoped tables that need RLS
 TENANT_TABLES = [
@@ -74,7 +75,9 @@ def upgrade() -> None:
     # -----------------------------------------------------------------------
     # Users
     # -----------------------------------------------------------------------
-    user_role = sa.Enum("owner", "sales_manager", "crew_lead", "crew_member", "customer", name="userrole")
+    user_role = sa.Enum(
+        "owner", "sales_manager", "crew_lead", "crew_member", "customer", name="userrole"
+    )
     op.create_table(
         "users",
         sa.Column("id", UUID(as_uuid=True), primary_key=True),
@@ -109,13 +112,30 @@ def upgrade() -> None:
     # Materials
     # -----------------------------------------------------------------------
     material_category = sa.Enum(
-        "shingles", "underlayment", "flashing", "ridge_vent", "ice_water_shield",
-        "drip_edge", "nails_fasteners", "siding_vinyl", "siding_fiber_cement",
-        "siding_wood", "trim", "soffit", "gutters", "other",
+        "shingles",
+        "underlayment",
+        "flashing",
+        "ridge_vent",
+        "ice_water_shield",
+        "drip_edge",
+        "nails_fasteners",
+        "siding_vinyl",
+        "siding_fiber_cement",
+        "siding_wood",
+        "trim",
+        "soffit",
+        "gutters",
+        "other",
         name="materialcategory",
     )
     unit_type = sa.Enum(
-        "square", "bundle", "linear_foot", "square_foot", "piece", "roll", "box",
+        "square",
+        "bundle",
+        "linear_foot",
+        "square_foot",
+        "piece",
+        "roll",
+        "box",
         name="unittype",
     )
     op.create_table(
@@ -132,7 +152,9 @@ def upgrade() -> None:
         sa.Column("units_per_square", sa.Float),
         sa.Column("supplier_name", sa.String(255)),
         sa.Column("supplier_part_number", sa.String(100)),
-        sa.Column("rate_card_version_id", UUID(as_uuid=True), sa.ForeignKey("rate_card_versions.id")),
+        sa.Column(
+            "rate_card_version_id", UUID(as_uuid=True), sa.ForeignKey("rate_card_versions.id")
+        ),
         sa.Column("is_active", sa.Boolean, default=True),
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
         sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
@@ -141,7 +163,9 @@ def upgrade() -> None:
     # -----------------------------------------------------------------------
     # Waste Factors
     # -----------------------------------------------------------------------
-    roof_complexity = sa.Enum("simple", "moderate", "complex", "very_complex", name="roofcomplexity")
+    roof_complexity = sa.Enum(
+        "simple", "moderate", "complex", "very_complex", name="roofcomplexity"
+    )
     op.create_table(
         "waste_factors",
         sa.Column("id", UUID(as_uuid=True), primary_key=True),
@@ -157,12 +181,22 @@ def upgrade() -> None:
     # Labor Rates
     # -----------------------------------------------------------------------
     labor_task_type = sa.Enum(
-        "tear_off", "install_shingles", "install_underlayment", "install_flashing",
-        "install_siding", "install_trim", "install_gutters", "repair_patch",
-        "inspection", "cleanup", "other",
+        "tear_off",
+        "install_shingles",
+        "install_underlayment",
+        "install_flashing",
+        "install_siding",
+        "install_trim",
+        "install_gutters",
+        "repair_patch",
+        "inspection",
+        "cleanup",
+        "other",
         name="labortasktype",
     )
-    labor_rate_unit = sa.Enum("per_square", "per_linear_foot", "per_hour", "flat_rate", name="laborrateunit")
+    labor_rate_unit = sa.Enum(
+        "per_square", "per_linear_foot", "per_hour", "flat_rate", name="laborrateunit"
+    )
     op.create_table(
         "labor_rates",
         sa.Column("id", UUID(as_uuid=True), primary_key=True),
@@ -175,7 +209,9 @@ def upgrade() -> None:
         sa.Column("crew_size_adjustment_pct", sa.Float, default=0.0),
         sa.Column("region_adjustment_pct", sa.Float, default=0.0),
         sa.Column("markup_pct", sa.Float, default=0.0),
-        sa.Column("rate_card_version_id", UUID(as_uuid=True), sa.ForeignKey("rate_card_versions.id")),
+        sa.Column(
+            "rate_card_version_id", UUID(as_uuid=True), sa.ForeignKey("rate_card_versions.id")
+        ),
         sa.Column("is_active", sa.Boolean, default=True),
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
         sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
@@ -205,14 +241,28 @@ def upgrade() -> None:
     # Projects
     # -----------------------------------------------------------------------
     project_type = sa.Enum(
-        "roof_replacement", "roof_repair", "siding_install", "siding_repair",
-        "gutters", "combo", "other",
+        "roof_replacement",
+        "roof_repair",
+        "siding_install",
+        "siding_repair",
+        "gutters",
+        "combo",
+        "other",
         name="projecttype",
     )
     project_status = sa.Enum(
-        "lead", "onboarded", "estimated", "contract_sent", "contract_signed",
-        "scheduled", "in_progress", "qc_review", "completed", "invoiced",
-        "paid", "cancelled",
+        "lead",
+        "onboarded",
+        "estimated",
+        "contract_sent",
+        "contract_signed",
+        "scheduled",
+        "in_progress",
+        "qc_review",
+        "completed",
+        "invoiced",
+        "paid",
+        "cancelled",
         name="projectstatus",
     )
     op.create_table(
@@ -266,7 +316,9 @@ def upgrade() -> None:
     # -----------------------------------------------------------------------
     # Project Milestones
     # -----------------------------------------------------------------------
-    milestone_status = sa.Enum("pending", "in_progress", "awaiting_qc", "approved", "rejected", name="milestonestatus")
+    milestone_status = sa.Enum(
+        "pending", "in_progress", "awaiting_qc", "approved", "rejected", name="milestonestatus"
+    )
     op.create_table(
         "project_milestones",
         sa.Column("id", UUID(as_uuid=True), primary_key=True),
@@ -332,7 +384,9 @@ def upgrade() -> None:
     # SMS Consents (TCPA)
     # -----------------------------------------------------------------------
     consent_status = sa.Enum("opted_in", "opted_out", "pending", name="consentstatus")
-    consent_source = sa.Enum("web_form", "text_keyword", "verbal", "import", "api", name="consentsource")
+    consent_source = sa.Enum(
+        "web_form", "text_keyword", "verbal", "import", "api", name="consentsource"
+    )
     op.create_table(
         "sms_consents",
         sa.Column("id", UUID(as_uuid=True), primary_key=True),
@@ -396,18 +450,38 @@ def downgrade() -> None:
 
     # Drop tables in reverse dependency order
     for table in [
-        "audit_logs", "sms_consents", "message_media", "messages",
-        "project_milestones", "milestone_templates", "projects",
-        "permit_fees", "labor_rates", "waste_factors", "materials",
-        "rate_card_versions", "users", "companies",
+        "audit_logs",
+        "sms_consents",
+        "message_media",
+        "messages",
+        "project_milestones",
+        "milestone_templates",
+        "projects",
+        "permit_fees",
+        "labor_rates",
+        "waste_factors",
+        "materials",
+        "rate_card_versions",
+        "users",
+        "companies",
     ]:
         op.drop_table(table)
 
     # Drop enums
     for enum_name in [
-        "consentsource", "consentstatus", "messagesendertype", "messagechannel",
-        "messagedirection", "milestonestatus", "projectstatus", "projecttype",
-        "laborrateunit", "labortasktype", "roofcomplexity", "unittype",
-        "materialcategory", "userrole",
+        "consentsource",
+        "consentstatus",
+        "messagesendertype",
+        "messagechannel",
+        "messagedirection",
+        "milestonestatus",
+        "projectstatus",
+        "projecttype",
+        "laborrateunit",
+        "labortasktype",
+        "roofcomplexity",
+        "unittype",
+        "materialcategory",
+        "userrole",
     ]:
         op.execute(f"DROP TYPE IF EXISTS {enum_name}")
