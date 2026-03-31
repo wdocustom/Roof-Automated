@@ -1,0 +1,127 @@
+/**
+ * API client for the Roof-Automated backend.
+ */
+
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
+
+async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
+  const res = await fetch(`${API_BASE}${path}`, {
+    ...init,
+    headers: {
+      "Content-Type": "application/json",
+      ...init?.headers,
+    },
+  });
+
+  if (!res.ok) {
+    throw new Error(`API ${res.status}: ${res.statusText}`);
+  }
+
+  return res.json() as Promise<T>;
+}
+
+// ── Dashboard ────────────────────────────────────────────────
+
+export interface ProjectSummary {
+  active: number;
+  completed_this_month: number;
+  by_status: Record<string, number>;
+}
+
+export interface AgentPerformance {
+  events_processed_7d: number;
+  escalations_7d: number;
+  escalation_rate_pct: number;
+  autonomy_rate_pct: number;
+}
+
+export interface DashboardInsights {
+  project_summary: ProjectSummary;
+  agent_performance: AgentPerformance;
+  insights: string[];
+}
+
+export interface AgentMetrics {
+  period_days: number;
+  by_agent: Record<string, number>;
+  by_type: Record<string, number>;
+  total_events: number;
+}
+
+export interface Alert {
+  id: string;
+  type: string;
+  severity: "high" | "medium";
+  project_id: string;
+  description: string;
+  data: Record<string, unknown>;
+  created_at: string;
+}
+
+export interface AlertsResponse {
+  alerts: Alert[];
+  total: number;
+  high_severity: number;
+}
+
+export interface CostTracking {
+  period_days: number;
+  total_agent_invocations: number;
+  projects_touched: number;
+  estimated_llm_cost: number;
+  cost_per_project: number;
+}
+
+export function fetchInsights() {
+  return apiFetch<DashboardInsights>("/dashboard/insights");
+}
+
+export function fetchAgentMetrics(days = 7) {
+  return apiFetch<AgentMetrics>(`/dashboard/agent-metrics?days=${days}`);
+}
+
+export function fetchAlerts() {
+  return apiFetch<AlertsResponse>("/dashboard/alerts");
+}
+
+export function fetchCostTracking(days = 30) {
+  return apiFetch<CostTracking>(`/dashboard/cost-tracking?days=${days}`);
+}
+
+// ── Projects ─────────────────────────────────────────────────
+
+export interface Project {
+  id: string;
+  property_address: string;
+  property_city: string;
+  property_state: string;
+  property_zip: string;
+  project_type: string;
+  status: string;
+  description: string | null;
+  estimated_sqft: number | null;
+  estimate_low: number | null;
+  estimate_high: number | null;
+  contract_amount: number | null;
+  scheduled_start: string | null;
+  scheduled_end: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ProjectListResponse {
+  items: Project[];
+  total: number;
+}
+
+export function fetchProjects(status?: string, skip = 0, limit = 50) {
+  const params = new URLSearchParams();
+  if (status) params.set("status", status);
+  params.set("skip", String(skip));
+  params.set("limit", String(limit));
+  return apiFetch<ProjectListResponse>(`/projects?${params}`);
+}
+
+export function fetchProject(id: string) {
+  return apiFetch<Project>(`/projects/${id}`);
+}
