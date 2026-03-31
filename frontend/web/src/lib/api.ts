@@ -94,6 +94,8 @@ export function fetchCostTracking(days = 30) {
 
 export interface Project {
   id: string;
+  company_id: string;
+  customer_id: string;
   property_address: string;
   property_city: string;
   property_state: string;
@@ -107,6 +109,7 @@ export interface Project {
   contract_amount: number | null;
   scheduled_start: string | null;
   scheduled_end: string | null;
+  lead_source: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -126,4 +129,78 @@ export function fetchProjects(status?: string, skip = 0, limit = 50) {
 
 export function fetchProject(id: string) {
   return apiFetch<Project>(`/projects/${id}`);
+}
+
+export function updateProject(id: string, data: Record<string, unknown>) {
+  return apiFetch<Project>(`/projects/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(data),
+  });
+}
+
+// ── Messages ─────────────────────────────────────────────────
+
+export interface MessageResponse {
+  id: string;
+  project_id: string | null;
+  from_phone: string;
+  to_phone: string;
+  direction: "inbound" | "outbound";
+  sender_type: string;
+  body: string | null;
+  channel: string;
+  twilio_message_sid: string | null;
+  twilio_status: string | null;
+  agent_name: string | null;
+  agent_confidence: number | null;
+  created_at: string;
+}
+
+export interface Conversation {
+  phone_number: string;
+  message_count: number;
+  last_message: string | null;
+  last_message_at: string | null;
+}
+
+export interface ConversationThread {
+  phone_number: string;
+  messages: MessageResponse[];
+  total: number;
+}
+
+export function fetchConversations() {
+  return apiFetch<Conversation[]>("/messages");
+}
+
+export function fetchThread(phoneNumber: string) {
+  return apiFetch<ConversationThread>(
+    `/messages/${encodeURIComponent(phoneNumber)}`
+  );
+}
+
+// ── Settings ─────────────────────────────────────────────────
+
+export interface CompanySettings {
+  name: string;
+  phone: string | null;
+  email: string | null;
+  address: string | null;
+  city: string | null;
+  state: string | null;
+  zip_code: string | null;
+  twilio_phone_number: string | null;
+  human_review_threshold_dollars: number;
+  agent_confidence_threshold: number;
+}
+
+export function fetchCompanySettings() {
+  return apiFetch<CompanySettings>("/settings/company");
+}
+
+export function updateCompanySettings(data: Partial<CompanySettings>) {
+  return apiFetch<CompanySettings>("/settings/company", {
+    method: "PATCH",
+    body: JSON.stringify(data),
+  });
 }

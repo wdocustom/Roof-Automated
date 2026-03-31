@@ -50,9 +50,10 @@ export async function GET(
   }
 }
 
-export async function POST(
+async function proxyMutatingRequest(
   request: NextRequest,
-  { params }: { params: Promise<{ path: string[] }> }
+  params: Promise<{ path: string[] }>,
+  method: string
 ) {
   try {
     const { data: session } = await auth.getSession();
@@ -67,7 +68,7 @@ export async function POST(
     const body = await request.text();
 
     const res = await fetch(url.toString(), {
-      method: "POST",
+      method,
       headers: {
         "Content-Type": "application/json",
         "X-User-Id": session.user.id,
@@ -90,4 +91,25 @@ export async function POST(
     const message = err instanceof Error ? err.message : "Unknown proxy error";
     return NextResponse.json({ error: message }, { status: 500 });
   }
+}
+
+export async function POST(
+  request: NextRequest,
+  { params }: { params: Promise<{ path: string[] }> }
+) {
+  return proxyMutatingRequest(request, params, "POST");
+}
+
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: Promise<{ path: string[] }> }
+) {
+  return proxyMutatingRequest(request, params, "PATCH");
+}
+
+export async function PUT(
+  request: NextRequest,
+  { params }: { params: Promise<{ path: string[] }> }
+) {
+  return proxyMutatingRequest(request, params, "PUT");
 }
