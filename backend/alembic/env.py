@@ -1,5 +1,6 @@
 """Alembic migration environment."""
 
+import sys
 from logging.config import fileConfig
 
 from sqlalchemy import engine_from_config, pool
@@ -12,8 +13,16 @@ config = context.config
 
 # Neon's connection pooler (-pooler endpoint) uses PgBouncer in transaction mode,
 # which doesn't support advisory locks required by Alembic. Always use direct connection.
-sync_url = settings.database_sync_url.replace("-pooler.", ".")
+raw_url = settings.database_sync_url
+sync_url = raw_url.replace("-pooler.", ".")
 config.set_main_option("sqlalchemy.url", sync_url)
+
+# Log connection info for debugging (mask password)
+_masked = sync_url.split("@")[-1] if "@" in sync_url else "unknown"
+print(f"[alembic env] Connecting to: ...@{_masked}", file=sys.stderr)
+if "-pooler" in raw_url:
+    print("[alembic env] Stripped -pooler from URL (using direct connection)", file=sys.stderr)
+print(f"[alembic env] Models registered: {len(Base.metadata.tables)} tables", file=sys.stderr)
 
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)

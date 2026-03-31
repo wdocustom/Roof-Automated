@@ -7,13 +7,17 @@ Phase 5: Provides data for the owner-facing dashboard:
   - Per-tenant cost tracking
 """
 
+import logging
 from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy import func, select
+from sqlalchemy.exc import ProgrammingError
 
 from app.core.database import get_tenant_session
 from app.middleware.tenant import get_company_id
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 
@@ -25,71 +29,86 @@ async def get_insights(company_id: str = Depends(get_company_id)):
     Returns project velocity, agent performance, and actionable insights
     that help owners understand how the AI swarm is performing.
     """
-    from app.agents.events import ProjectEvent
-    from app.models.project import Project, ProjectStatus
+    try:
+        from app.agents.events import ProjectEvent
+        from app.models.project import Project, ProjectStatus
 
-    async with get_tenant_session(company_id) as session:
-        # Count projects by status
-        status_result = await session.execute(
-            select(Project.status, func.count(Project.id)).group_by(Project.status)
-        )
-        status_counts = {row[0].value: row[1] for row in status_result.all()}
-
-        # Count events in last 7 days
-        week_ago = datetime.now(UTC) - timedelta(days=7)
-        event_count_result = await session.execute(
-            select(func.count(ProjectEvent.id)).where(ProjectEvent.created_at >= week_ago)
-        )
-        events_this_week = event_count_result.scalar() or 0
-
-        # Count escalations in last 7 days
-        escalation_result = await session.execute(
-            select(func.count(ProjectEvent.id)).where(
-                ProjectEvent.event_type == "human_escalation",
-                ProjectEvent.created_at >= week_ago,
+        async with get_tenant_session(company_id) as session:
+            # Count projects by status
+            status_result = await session.execute(
+                select(Project.status, func.count(Project.id)).group_by(Project.status)
             )
-        )
-        escalations_this_week = escalation_result.scalar() or 0
+            status_counts = {row[0].value: row[1] for row in status_result.all()}
 
-        # Active projects (in_progress or scheduled)
-        active_result = await session.execute(
-            select(func.count(Project.id)).where(
-                Project.status.in_([ProjectStatus.IN_PROGRESS, ProjectStatus.SCHEDULED])
+            # Count events in last 7 days
+            week_ago = datetime.now(UTC) - timedelta(days=7)
+            event_count_result = await session.execute(
+                select(func.count(ProjectEvent.id)).where(ProjectEvent.created_at >= week_ago)
             )
-        )
-        active_projects = active_result.scalar() or 0
+            events_this_week = event_count_result.scalar() or 0
 
-        # Completed projects this month
-        month_start = datetime.now(UTC).replace(day=1, hour=0, minute=0, second=0)
-        completed_result = await session.execute(
-            select(func.count(Project.id)).where(
-                Project.status.in_([ProjectStatus.COMPLETED, ProjectStatus.PAID]),
-                Project.updated_at >= month_start,
+            # Count escalations in last 7 days
+            escalation_result = await session.execute(
+                select(func.count(ProjectEvent.id)).where(
+                    ProjectEvent.event_type == "human_escalation",
+                    ProjectEvent.created_at >= week_ago,
+                )
             )
+            escalations_this_week = escalation_result.scalar() or 0
+
+            # Active projects (in_progress or scheduled)
+            active_result = await session.execute(
+                select(func.count(Project.id)).where(
+                    Project.status.in_([ProjectStatus.IN_PROGRESS, ProjectStatus.SCHEDULED])
+                )
+            )
+            active_projects = active_result.scalar() or 0
+
+            # Completed projects this month
+            month_start = datetime.now(UTC).replace(day=1, hour=0, minute=0, second=0)
+            completed_result = await session.execute(
+                select(func.count(Project.id)).where(
+                    Project.status.in_([ProjectStatus.COMPLETED, ProjectStatus.PAID]),
+                    Project.updated_at >= month_start,
+                )
+            )
+            completed_this_month = completed_result.scalar() or 0
+
+        # Calculate escalation rate
+        escalation_rate = (
+            round(escalations_this_week / events_this_week * 100, 1)
+            if events_this_week > 0
+            else 0.0
         )
-        completed_this_month = completed_result.scalar() or 0
 
-    # Calculate escalation rate
-    escalation_rate = (
-        round(escalations_this_week / events_this_week * 100, 1) if events_this_week > 0 else 0.0
-    )
-
-    return {
-        "project_summary": {
-            "active": active_projects,
-            "completed_this_month": completed_this_month,
-            "by_status": status_counts,
-        },
-        "agent_performance": {
-            "events_processed_7d": events_this_week,
-            "escalations_7d": escalations_this_week,
-            "escalation_rate_pct": escalation_rate,
-            "autonomy_rate_pct": round(100 - escalation_rate, 1),
-        },
-        "insights": _generate_insights(
-            active_projects, escalation_rate, status_counts, completed_this_month
-        ),
-    }
+        return {
+            "project_summary": {
+                "active": active_projects,
+                "completed_this_month": completed_this_month,
+                "by_status": status_counts,
+            },
+            "agent_performance": {
+                "events_processed_7d": events_this_week,
+                "escalations_7d": escalations_this_week,
+                "escalation_rate_pct": escalation_rate,
+                "autonomy_rate_pct": round(100 - escalation_rate, 1),
+            },
+            "insights": _generate_insights(
+                active_projects, escalation_rate, status_counts, completed_this_month
+            ),
+        }
+    except ProgrammingError:
+        logger.warning("insights: tables not yet created — returning empty defaults")
+        return {
+            "project_summary": {"active": 0, "completed_this_month": 0, "by_status": {}},
+            "agent_performance": {
+                "events_processed_7d": 0,
+                "escalations_7d": 0,
+                "escalation_rate_pct": 0.0,
+                "autonomy_rate_pct": 100.0,
+            },
+            "insights": ["System initializing — database migrations pending."],
+        }
 
 
 @router.get("/agent-metrics")
@@ -101,33 +120,42 @@ async def get_agent_metrics(
 
     Breaks down event volume by agent and type over the specified period.
     """
-    from app.agents.events import ProjectEvent
+    try:
+        from app.agents.events import ProjectEvent
 
-    cutoff = datetime.now(UTC) - timedelta(days=days)
+        cutoff = datetime.now(UTC) - timedelta(days=days)
 
-    async with get_tenant_session(company_id) as session:
-        # Events by agent
-        agent_result = await session.execute(
-            select(ProjectEvent.agent_name, func.count(ProjectEvent.id))
-            .where(ProjectEvent.created_at >= cutoff)
-            .group_by(ProjectEvent.agent_name)
-        )
-        by_agent = {row[0]: row[1] for row in agent_result.all()}
+        async with get_tenant_session(company_id) as session:
+            # Events by agent
+            agent_result = await session.execute(
+                select(ProjectEvent.agent_name, func.count(ProjectEvent.id))
+                .where(ProjectEvent.created_at >= cutoff)
+                .group_by(ProjectEvent.agent_name)
+            )
+            by_agent = {row[0]: row[1] for row in agent_result.all()}
 
-        # Events by type
-        type_result = await session.execute(
-            select(ProjectEvent.event_type, func.count(ProjectEvent.id))
-            .where(ProjectEvent.created_at >= cutoff)
-            .group_by(ProjectEvent.event_type)
-        )
-        by_type = {row[0]: row[1] for row in type_result.all()}
+            # Events by type
+            type_result = await session.execute(
+                select(ProjectEvent.event_type, func.count(ProjectEvent.id))
+                .where(ProjectEvent.created_at >= cutoff)
+                .group_by(ProjectEvent.event_type)
+            )
+            by_type = {row[0]: row[1] for row in type_result.all()}
 
-    return {
-        "period_days": days,
-        "by_agent": by_agent,
-        "by_type": by_type,
-        "total_events": sum(by_agent.values()),
-    }
+        return {
+            "period_days": days,
+            "by_agent": by_agent,
+            "by_type": by_type,
+            "total_events": sum(by_agent.values()),
+        }
+    except ProgrammingError:
+        logger.warning("agent-metrics: tables not yet created — returning empty defaults")
+        return {
+            "period_days": days,
+            "by_agent": {},
+            "by_type": {},
+            "total_events": 0,
+        }
 
 
 @router.get("/alerts")
@@ -136,50 +164,56 @@ async def get_active_alerts(company_id: str = Depends(get_company_id)):
 
     Surfaces: overdue payments, QC flags, weather delays, escalations.
     """
-    from app.agents.events import ProjectEvent
+    try:
+        from app.agents.events import ProjectEvent
 
-    day_ago = datetime.now(UTC) - timedelta(days=1)
+        day_ago = datetime.now(UTC) - timedelta(days=1)
 
-    alert_event_types = [
-        "human_escalation",
-        "payment_overdue",
-        "milestone_qc_failed",
-        "weather_alert",
-        "price_update_flagged",
-    ]
+        alert_event_types = [
+            "human_escalation",
+            "payment_overdue",
+            "milestone_qc_failed",
+            "weather_alert",
+            "price_update_flagged",
+        ]
 
-    async with get_tenant_session(company_id) as session:
-        result = await session.execute(
-            select(ProjectEvent)
-            .where(
-                ProjectEvent.event_type.in_(alert_event_types),
-                ProjectEvent.created_at >= day_ago,
+        async with get_tenant_session(company_id) as session:
+            result = await session.execute(
+                select(ProjectEvent)
+                .where(
+                    ProjectEvent.event_type.in_(alert_event_types),
+                    ProjectEvent.created_at >= day_ago,
+                )
+                .order_by(ProjectEvent.created_at.desc())
+                .limit(50)
             )
-            .order_by(ProjectEvent.created_at.desc())
-            .limit(50)
-        )
-        events = result.scalars().all()
+            events = result.scalars().all()
 
-    alerts = []
-    for e in events:
-        severity = "high" if e.event_type in ("human_escalation", "payment_overdue") else "medium"
-        alerts.append(
-            {
-                "id": str(e.id),
-                "type": e.event_type,
-                "severity": severity,
-                "project_id": str(e.project_id),
-                "description": e.description or "",
-                "data": e.data or {},
-                "created_at": e.created_at.isoformat() if e.created_at else "",
-            }
-        )
+        alerts = []
+        for e in events:
+            severity = (
+                "high" if e.event_type in ("human_escalation", "payment_overdue") else "medium"
+            )
+            alerts.append(
+                {
+                    "id": str(e.id),
+                    "type": e.event_type,
+                    "severity": severity,
+                    "project_id": str(e.project_id),
+                    "description": e.description or "",
+                    "data": e.data or {},
+                    "created_at": e.created_at.isoformat() if e.created_at else "",
+                }
+            )
 
-    return {
-        "alerts": alerts,
-        "total": len(alerts),
-        "high_severity": sum(1 for a in alerts if a["severity"] == "high"),
-    }
+        return {
+            "alerts": alerts,
+            "total": len(alerts),
+            "high_severity": sum(1 for a in alerts if a["severity"] == "high"),
+        }
+    except ProgrammingError:
+        logger.warning("alerts: tables not yet created — returning empty defaults")
+        return {"alerts": [], "total": 0, "high_severity": 0}
 
 
 @router.get("/cost-tracking")
@@ -191,36 +225,46 @@ async def get_cost_tracking(
 
     Tracks token usage via event metadata to approximate costs.
     """
-    from app.agents.events import ProjectEvent
+    try:
+        from app.agents.events import ProjectEvent
 
-    cutoff = datetime.now(UTC) - timedelta(days=days)
+        cutoff = datetime.now(UTC) - timedelta(days=days)
 
-    async with get_tenant_session(company_id) as session:
-        # Count total events as a proxy for agent invocations
-        event_count = await session.execute(
-            select(func.count(ProjectEvent.id)).where(ProjectEvent.created_at >= cutoff)
-        )
-        total_events = event_count.scalar() or 0
-
-        # Count projects touched
-        project_count = await session.execute(
-            select(func.count(func.distinct(ProjectEvent.project_id))).where(
-                ProjectEvent.created_at >= cutoff
+        async with get_tenant_session(company_id) as session:
+            # Count total events as a proxy for agent invocations
+            event_count = await session.execute(
+                select(func.count(ProjectEvent.id)).where(ProjectEvent.created_at >= cutoff)
             )
-        )
-        projects_touched = project_count.scalar() or 0
+            total_events = event_count.scalar() or 0
 
-    # Estimate costs (rough: ~$0.01-0.05 per agent invocation on average)
-    estimated_cost = round(total_events * 0.025, 2)
-    cost_per_project = round(estimated_cost / max(projects_touched, 1), 2)
+            # Count projects touched
+            project_count = await session.execute(
+                select(func.count(func.distinct(ProjectEvent.project_id))).where(
+                    ProjectEvent.created_at >= cutoff
+                )
+            )
+            projects_touched = project_count.scalar() or 0
 
-    return {
-        "period_days": days,
-        "total_agent_invocations": total_events,
-        "projects_touched": projects_touched,
-        "estimated_llm_cost": estimated_cost,
-        "cost_per_project": cost_per_project,
-    }
+        # Estimate costs (rough: ~$0.01-0.05 per agent invocation on average)
+        estimated_cost = round(total_events * 0.025, 2)
+        cost_per_project = round(estimated_cost / max(projects_touched, 1), 2)
+
+        return {
+            "period_days": days,
+            "total_agent_invocations": total_events,
+            "projects_touched": projects_touched,
+            "estimated_llm_cost": estimated_cost,
+            "cost_per_project": cost_per_project,
+        }
+    except ProgrammingError:
+        logger.warning("cost-tracking: tables not yet created — returning empty defaults")
+        return {
+            "period_days": days,
+            "total_agent_invocations": 0,
+            "projects_touched": 0,
+            "estimated_llm_cost": 0.0,
+            "cost_per_project": 0.0,
+        }
 
 
 def _generate_insights(
