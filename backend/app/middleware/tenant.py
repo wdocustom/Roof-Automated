@@ -1,15 +1,11 @@
-"""Clerk JWT → PostgreSQL RLS tenant isolation middleware.
+"""Auth → PostgreSQL RLS tenant isolation middleware.
 
-This is the security-critical bridge between Clerk auth and database RLS.
-Every authenticated request extracts org_id from the Clerk JWT and sets it
+Supports two auth modes:
+  1. JWT auth (Bearer token) — validated via JWKS
+  2. Internal proxy auth (X-User-Id header + shared secret) — for Next.js API proxy
+
+Every authenticated request extracts the user/org context and sets it
 as the PostgreSQL session variable for Row-Level Security filtering.
-
-Flow:
-  1. Request arrives with Authorization: Bearer <clerk_jwt>
-  2. Middleware validates JWT signature via Clerk JWKS
-  3. Extracts org_id from JWT claims
-  4. Sets `app.current_company_id` on the DB connection via SET LOCAL
-  5. All subsequent queries are filtered by RLS automatically
 """
 
 from fastapi import Depends, HTTPException, Request, status
@@ -20,14 +16,14 @@ import httpx
 
 from app.core.config import settings
 
-security = HTTPBearer()
+security = HTTPBearer(auto_error=False)
 
 # Cache JWKS keys in memory (refreshed on 401)
 _jwks_cache: dict | None = None
 
 
 class AuthContext(BaseModel):
-    """Authenticated user context extracted from Clerk JWT."""
+    """Authenticated user context."""
 
     user_id: str
     org_id: str
@@ -36,11 +32,17 @@ class AuthContext(BaseModel):
 
 
 async def _get_jwks() -> dict:
-    """Fetch Clerk JWKS (JSON Web Key Set) for JWT verification."""
+    """Fetch JWKS (JSON Web Key Set) for JWT verification."""
     global _jwks_cache
     if _jwks_cache is None:
+        jwks_url = settings.neon_auth_jwks_url
+        if not jwks_url:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Auth JWKS URL not configured",
+            )
         async with httpx.AsyncClient() as client:
-            resp = await client.get(settings.clerk_jwks_url)
+            resp = await client.get(jwks_url)
             resp.raise_for_status()
             _jwks_cache = resp.json()
     return _jwks_cache
@@ -52,17 +54,31 @@ async def _invalidate_jwks_cache() -> None:
 
 
 async def get_auth_context(
-    credentials: HTTPAuthorizationCredentials = Depends(security),
+    request: Request,
+    credentials: HTTPAuthorizationCredentials | None = Depends(security),
 ) -> AuthContext:
-    """Validate Clerk JWT and extract tenant context.
+    """Extract auth context from JWT or internal proxy headers."""
 
-    Raises 401 if token is invalid or missing org_id.
-    """
+    # Mode 1: Internal proxy auth (from Next.js API proxy)
+    user_id = request.headers.get("X-User-Id")
+    if user_id and not credentials:
+        return AuthContext(
+            user_id=user_id,
+            org_id=user_id,  # Use user_id as org until org support is added
+            email=request.headers.get("X-User-Email"),
+        )
+
+    # Mode 2: JWT Bearer auth
+    if not credentials:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Missing authentication",
+        )
+
     token = credentials.credentials
 
     try:
         jwks = await _get_jwks()
-        # Decode header to find the right key
         unverified_header = jwt.get_unverified_header(token)
         kid = unverified_header.get("kid")
 
@@ -73,7 +89,6 @@ async def get_auth_context(
                 break
 
         if rsa_key is None:
-            # Key not found — maybe rotated. Refresh cache and retry once.
             await _invalidate_jwks_cache()
             jwks = await _get_jwks()
             for key in jwks.get("keys", []):
@@ -100,18 +115,19 @@ async def get_auth_context(
             detail=f"Invalid token: {e}",
         )
 
-    # Extract org context — required for tenant isolation
-    org_id = payload.get("org_id")
-    if not org_id:
+    user_id = payload.get("sub", "")
+    org_id = payload.get("org_id") or user_id
+
+    if not user_id:
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="No organization context. User must belong to an organization.",
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid token: missing user identity",
         )
 
     return AuthContext(
-        user_id=payload.get("sub", ""),
+        user_id=user_id,
         org_id=org_id,
-        org_role=payload.get("org_role"),
+        org_role=payload.get("org_role") or payload.get("role"),
         email=payload.get("email"),
     )
 

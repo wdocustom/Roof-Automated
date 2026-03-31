@@ -2,7 +2,9 @@
  * API client for the Roof-Automated backend.
  */
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
+// In production, API calls go through the Next.js proxy (/api/proxy/...)
+// which handles auth server-side. In dev, can hit the backend directly.
+const API_BASE = "/api/proxy";
 
 async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
