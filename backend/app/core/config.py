@@ -25,6 +25,7 @@ class Settings(BaseSettings):
     temporal_host: str = "localhost:7233"
     temporal_namespace: str = "roof-automated"
     temporal_task_queue: str = "roof-main"
+    temporal_api_key: str | None = None
     temporal_tls_cert_path: str | None = None
     temporal_tls_key_path: str | None = None
 

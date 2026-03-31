@@ -13,6 +13,17 @@ async def get_temporal_client() -> Client:
     if _client is not None:
         return _client
 
+    # API key auth (Temporal Cloud recommended)
+    if settings.temporal_api_key:
+        _client = await Client.connect(
+            settings.temporal_host,
+            namespace=settings.temporal_namespace,
+            tls=True,
+            api_key=settings.temporal_api_key,
+        )
+        return _client
+
+    # mTLS auth (alternative)
     tls_config = None
     if settings.temporal_tls_cert_path and settings.temporal_tls_key_path:
         with open(settings.temporal_tls_cert_path, "rb") as f:
