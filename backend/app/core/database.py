@@ -4,6 +4,7 @@ Every request sets `app.current_company_id` on the connection so PostgreSQL
 Row-Level Security policies can enforce tenant isolation automatically.
 """
 
+import re
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
@@ -15,6 +16,8 @@ from sqlalchemy.ext.asyncio import (
 )
 
 from app.core.config import settings
+
+_UUID_RE = re.compile(r"^[0-9a-fA-F-]+$")
 
 engine = create_async_engine(
     settings.database_url,
@@ -36,10 +39,14 @@ async def get_tenant_session(company_id: str) -> AsyncGenerator[AsyncSession]:
             result = await session.execute(query)
     """
     async with async_session_factory() as session:
-        # Set the tenant context for RLS policies
+        # Validate company_id to prevent SQL injection (should be a UUID)
+        if not _UUID_RE.match(company_id):
+            raise ValueError(f"Invalid company_id format: {company_id}")
+        # Inline the value instead of using a bind parameter because asyncpg's
+        # prepared-statement protocol doesn't support parameterized SET commands
+        # through Neon's connection pooler.
         await session.execute(
-            text("SET LOCAL app.current_company_id = :cid"),
-            {"cid": company_id},
+            text(f"SET LOCAL app.current_company_id = '{company_id}'")
         )
         try:
             yield session
