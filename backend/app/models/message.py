@@ -43,14 +43,19 @@ class Message(BaseModel, TenantMixin):
     # Participants
     from_phone: Mapped[str] = mapped_column(String(20), nullable=False)
     to_phone: Mapped[str] = mapped_column(String(20), nullable=False)
-    direction: Mapped[MessageDirection] = mapped_column(Enum(MessageDirection), nullable=False)
-    sender_type: Mapped[MessageSenderType] = mapped_column(Enum(MessageSenderType), nullable=False)
+    direction: Mapped[MessageDirection] = mapped_column(
+        Enum(MessageDirection, values_callable=lambda x: [e.value for e in x]), nullable=False
+    )
+    sender_type: Mapped[MessageSenderType] = mapped_column(
+        Enum(MessageSenderType, values_callable=lambda x: [e.value for e in x]), nullable=False
+    )
     sender_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
 
     # Content
     body: Mapped[str | None] = mapped_column(Text)
     channel: Mapped[MessageChannel] = mapped_column(
-        Enum(MessageChannel), default=MessageChannel.SMS
+        Enum(MessageChannel, values_callable=lambda x: [e.value for e in x]),
+        default=MessageChannel.SMS,
     )
 
     # Twilio tracking

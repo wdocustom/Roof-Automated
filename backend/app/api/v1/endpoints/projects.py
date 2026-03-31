@@ -5,7 +5,7 @@ import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func, select
-from sqlalchemy.exc import ProgrammingError
+from sqlalchemy.exc import DBAPIError, ProgrammingError
 
 from app.core.database import get_tenant_session
 from app.middleware.tenant import get_company_id
@@ -51,7 +51,7 @@ async def list_projects(
             items=[ProjectResponse.model_validate(p) for p in projects],
             total=total,
         )
-    except ProgrammingError:
+    except (ProgrammingError, DBAPIError):
         logger.warning("list_projects: tables not yet created — returning empty list")
         return ProjectListResponse(items=[], total=0)
 
@@ -80,7 +80,7 @@ async def create_project(
             await session.flush()
             await session.refresh(project)
             return ProjectResponse.model_validate(project)
-    except ProgrammingError:
+    except (ProgrammingError, DBAPIError):
         raise HTTPException(
             status_code=503, detail="Database tables not yet initialized"
         )
@@ -99,7 +99,7 @@ async def get_project(
             if not project:
                 raise HTTPException(status_code=404, detail="Project not found")
             return ProjectResponse.model_validate(project)
-    except ProgrammingError:
+    except (ProgrammingError, DBAPIError):
         raise HTTPException(
             status_code=503, detail="Database tables not yet initialized"
         )
@@ -126,7 +126,7 @@ async def update_project(
             await session.flush()
             await session.refresh(project)
             return ProjectResponse.model_validate(project)
-    except ProgrammingError:
+    except (ProgrammingError, DBAPIError):
         raise HTTPException(
             status_code=503, detail="Database tables not yet initialized"
         )

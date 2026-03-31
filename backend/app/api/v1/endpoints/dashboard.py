@@ -12,7 +12,7 @@ from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy import func, select
-from sqlalchemy.exc import ProgrammingError
+from sqlalchemy.exc import DBAPIError, ProgrammingError
 
 from app.core.database import get_tenant_session
 from app.middleware.tenant import get_company_id
@@ -97,7 +97,7 @@ async def get_insights(company_id: str = Depends(get_company_id)):
                 active_projects, escalation_rate, status_counts, completed_this_month
             ),
         }
-    except ProgrammingError:
+    except (ProgrammingError, DBAPIError):
         logger.warning("insights: tables not yet created — returning empty defaults")
         return {
             "project_summary": {"active": 0, "completed_this_month": 0, "by_status": {}},
@@ -148,7 +148,7 @@ async def get_agent_metrics(
             "by_type": by_type,
             "total_events": sum(by_agent.values()),
         }
-    except ProgrammingError:
+    except (ProgrammingError, DBAPIError):
         logger.warning("agent-metrics: tables not yet created — returning empty defaults")
         return {
             "period_days": days,
@@ -211,7 +211,7 @@ async def get_active_alerts(company_id: str = Depends(get_company_id)):
             "total": len(alerts),
             "high_severity": sum(1 for a in alerts if a["severity"] == "high"),
         }
-    except ProgrammingError:
+    except (ProgrammingError, DBAPIError):
         logger.warning("alerts: tables not yet created — returning empty defaults")
         return {"alerts": [], "total": 0, "high_severity": 0}
 
@@ -256,7 +256,7 @@ async def get_cost_tracking(
             "estimated_llm_cost": estimated_cost,
             "cost_per_project": cost_per_project,
         }
-    except ProgrammingError:
+    except (ProgrammingError, DBAPIError):
         logger.warning("cost-tracking: tables not yet created — returning empty defaults")
         return {
             "period_days": days,

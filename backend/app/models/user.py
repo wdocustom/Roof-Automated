@@ -26,5 +26,7 @@ class User(BaseModel, TenantMixin):
     first_name: Mapped[str | None] = mapped_column(String(100))
     last_name: Mapped[str | None] = mapped_column(String(100))
     phone: Mapped[str | None] = mapped_column(String(20), index=True)
-    role: Mapped[UserRole] = mapped_column(Enum(UserRole), nullable=False)
+    role: Mapped[UserRole] = mapped_column(
+        Enum(UserRole, values_callable=lambda x: [e.value for e in x]), nullable=False
+    )
     is_active: Mapped[bool] = mapped_column(default=True)

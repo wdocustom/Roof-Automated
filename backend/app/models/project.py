@@ -63,9 +63,13 @@ class Project(BaseModel, TenantMixin):
     property_lng: Mapped[float | None] = mapped_column(Float)
 
     # Job details
-    project_type: Mapped[ProjectType] = mapped_column(Enum(ProjectType), nullable=False)
+    project_type: Mapped[ProjectType] = mapped_column(
+        Enum(ProjectType, values_callable=lambda x: [e.value for e in x]), nullable=False
+    )
     status: Mapped[ProjectStatus] = mapped_column(
-        Enum(ProjectStatus), default=ProjectStatus.LEAD, nullable=False
+        Enum(ProjectStatus, values_callable=lambda x: [e.value for e in x]),
+        default=ProjectStatus.LEAD,
+        nullable=False,
     )
     description: Mapped[str | None] = mapped_column(Text)
 
@@ -109,7 +113,9 @@ class MilestoneTemplate(BaseModel, TenantMixin):
     sort_order: Mapped[int] = mapped_column(Integer, default=0)
     requires_photo: Mapped[bool] = mapped_column(default=False)
     requires_human_signoff: Mapped[bool] = mapped_column(default=False)
-    project_type: Mapped[ProjectType | None] = mapped_column(Enum(ProjectType))
+    project_type: Mapped[ProjectType | None] = mapped_column(
+        Enum(ProjectType, values_callable=lambda x: [e.value for e in x])
+    )
 
 
 class MilestoneStatus(enum.StrEnum):
@@ -136,7 +142,8 @@ class ProjectMilestone(BaseModel, TenantMixin):
 
     name: Mapped[str] = mapped_column(String(100), nullable=False)
     status: Mapped[MilestoneStatus] = mapped_column(
-        Enum(MilestoneStatus), default=MilestoneStatus.PENDING
+        Enum(MilestoneStatus, values_callable=lambda x: [e.value for e in x]),
+        default=MilestoneStatus.PENDING,
     )
     sort_order: Mapped[int] = mapped_column(Integer, default=0)
     requires_photo: Mapped[bool] = mapped_column(default=False)

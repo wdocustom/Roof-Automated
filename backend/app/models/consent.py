@@ -34,8 +34,12 @@ class SMSConsent(BaseModel, TenantMixin):
         UUID(as_uuid=True), ForeignKey("users.id")
     )
 
-    status: Mapped[ConsentStatus] = mapped_column(Enum(ConsentStatus), nullable=False)
-    source: Mapped[ConsentSource] = mapped_column(Enum(ConsentSource), nullable=False)
+    status: Mapped[ConsentStatus] = mapped_column(
+        Enum(ConsentStatus, values_callable=lambda x: [e.value for e in x]), nullable=False
+    )
+    source: Mapped[ConsentSource] = mapped_column(
+        Enum(ConsentSource, values_callable=lambda x: [e.value for e in x]), nullable=False
+    )
 
     # When consent was given/revoked
     consented_at: Mapped[str | None] = mapped_column(DateTime(timezone=True))

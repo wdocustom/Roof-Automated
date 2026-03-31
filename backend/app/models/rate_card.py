@@ -74,14 +74,18 @@ class Material(BaseModel, TenantMixin):
 
     __tablename__ = "materials"
 
-    category: Mapped[MaterialCategory] = mapped_column(Enum(MaterialCategory), nullable=False)
+    category: Mapped[MaterialCategory] = mapped_column(
+        Enum(MaterialCategory, values_callable=lambda x: [e.value for e in x]), nullable=False
+    )
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[str | None] = mapped_column(Text)
     manufacturer: Mapped[str | None] = mapped_column(String(255))
     sku: Mapped[str | None] = mapped_column(String(100))
 
     # Pricing
-    unit_type: Mapped[UnitType] = mapped_column(Enum(UnitType), nullable=False)
+    unit_type: Mapped[UnitType] = mapped_column(
+        Enum(UnitType, values_callable=lambda x: [e.value for e in x]), nullable=False
+    )
     unit_cost: Mapped[float] = mapped_column(Float, nullable=False)
     units_per_square: Mapped[float | None] = mapped_column(Float)  # conversion factor
 
@@ -116,9 +120,11 @@ class WasteFactor(BaseModel, TenantMixin):
     __tablename__ = "waste_factors"
 
     material_category: Mapped[MaterialCategory] = mapped_column(
-        Enum(MaterialCategory), nullable=False
+        Enum(MaterialCategory, values_callable=lambda x: [e.value for e in x]), nullable=False
     )
-    roof_complexity: Mapped[RoofComplexity] = mapped_column(Enum(RoofComplexity), nullable=False)
+    roof_complexity: Mapped[RoofComplexity] = mapped_column(
+        Enum(RoofComplexity, values_callable=lambda x: [e.value for e in x]), nullable=False
+    )
     waste_percentage: Mapped[float] = mapped_column(Float, nullable=False)  # e.g., 15.0 = 15%
 
 
@@ -153,10 +159,14 @@ class LaborRate(BaseModel, TenantMixin):
 
     __tablename__ = "labor_rates"
 
-    task_type: Mapped[LaborTaskType] = mapped_column(Enum(LaborTaskType), nullable=False)
+    task_type: Mapped[LaborTaskType] = mapped_column(
+        Enum(LaborTaskType, values_callable=lambda x: [e.value for e in x]), nullable=False
+    )
     description: Mapped[str | None] = mapped_column(Text)
 
-    rate_unit: Mapped[LaborRateUnit] = mapped_column(Enum(LaborRateUnit), nullable=False)
+    rate_unit: Mapped[LaborRateUnit] = mapped_column(
+        Enum(LaborRateUnit, values_callable=lambda x: [e.value for e in x]), nullable=False
+    )
     base_rate: Mapped[float] = mapped_column(Float, nullable=False)
 
     # Adjustments
