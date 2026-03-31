@@ -1,5 +1,5 @@
 import { Sidebar } from "@/components/sidebar";
-import { stackServerApp } from "@/lib/stack";
+import { auth } from "@/lib/auth/server";
 import { redirect } from "next/navigation";
 
 export default async function DashboardLayout({
@@ -7,9 +7,9 @@ export default async function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const user = await stackServerApp.getUser();
+  const { data: session } = await auth.getSession();
 
-  if (!user) {
+  if (!session?.user) {
     redirect("/signin");
   }
 
