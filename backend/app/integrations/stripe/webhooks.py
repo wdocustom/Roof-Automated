@@ -26,7 +26,7 @@ def verify_webhook_signature(payload: bytes, sig_header: str) -> dict | None:
     try:
         event = stripe.Webhook.construct_event(payload, sig_header, settings.stripe_webhook_secret)
         return event
-    except stripe.error.SignatureVerificationError:
+    except stripe.SignatureVerificationError:
         logger.warning("stripe_webhook_signature_invalid")
         return None
     except ValueError:

@@ -5,7 +5,11 @@ Verifies webhook signature, extracts project metadata, and routes
 to the appropriate handler.
 """
 
+import logging
+
 from fastapi import APIRouter, HTTPException, Request
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/webhooks", tags=["webhooks"])
 
@@ -39,10 +43,16 @@ async def stripe_webhook(request: Request):
     company_id = metadata.get("company_id", "")
     project_id = metadata.get("project_id", "")
 
+    logger.info("stripe_webhook: %s (company=%s, project=%s)", event_type, company_id, project_id)
+
     handler = STRIPE_EVENT_HANDLERS.get(event_type)
     if handler:
-        result = await handler(event_data, company_id, project_id)
-        return {"status": "processed", "event_type": event_type, **result}
+        try:
+            result = await handler(event_data, company_id, project_id)
+            return {"status": "processed", "event_type": event_type, **result}
+        except Exception:
+            logger.exception("stripe_webhook: handler failed for %s", event_type)
+            return {"status": "error", "event_type": event_type}
 
     # Unhandled event type — acknowledge but don't process
     return {"status": "ignored", "event_type": event_type}
