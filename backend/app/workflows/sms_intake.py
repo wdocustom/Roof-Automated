@@ -34,6 +34,7 @@ class SMSIntakeInput:
     media_urls: list[dict]  # [{"url": "...", "content_type": "..."}]
     is_opt_out: bool = False
     is_help_request: bool = False
+    messaging_service_sid: str = ""
 
 
 # ---------------------------------------------------------------------------
@@ -56,6 +57,7 @@ async def store_inbound_message(input: SMSIntakeInput) -> dict:
         to_phone=input.to_phone,
         body=input.body,
         media_urls=input.media_urls,
+        messaging_service_sid=input.messaging_service_sid or None,
     )
     return result
 
@@ -123,6 +125,14 @@ class SMSIntakeWorkflow:
         )
 
         company_id = store_result.get("company_id", "")
+
+        # 1b. No company found — can't process further
+        if not company_id or store_result.get("status") == "no_company_found":
+            return {
+                "status": "no_company_found",
+                "from_phone": input.from_phone,
+                "to_phone": input.to_phone,
+            }
 
         # 2. Handle opt-out
         if input.is_opt_out and company_id:
@@ -196,6 +206,7 @@ async def start_sms_intake_workflow(
     media_urls: list[dict] | None = None,
     is_opt_out: bool = False,
     is_help_request: bool = False,
+    messaging_service_sid: str = "",
 ) -> str:
     """Start an SMS intake workflow. Returns the workflow ID."""
     from app.workflows.client import get_temporal_client
@@ -213,6 +224,7 @@ async def start_sms_intake_workflow(
             media_urls=media_urls or [],
             is_opt_out=is_opt_out,
             is_help_request=is_help_request,
+            messaging_service_sid=messaging_service_sid,
         ),
         id=workflow_id,
         task_queue=settings.temporal_task_queue,

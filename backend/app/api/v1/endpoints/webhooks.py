@@ -47,6 +47,7 @@ async def twilio_sms_webhook(
     To: str = Form(...),
     Body: str = Form(default=""),
     NumMedia: int = Form(default=0),
+    MessagingServiceSid: str = Form(default=""),
 ):
     """Receive inbound SMS/MMS from Twilio.
 
@@ -96,6 +97,7 @@ async def twilio_sms_webhook(
             media_urls=media_urls,
             is_opt_out=is_opt_out,
             is_help_request=is_help,
+            messaging_service_sid=MessagingServiceSid,
         )
 
         logger.info("SMS dispatched to Temporal: workflow_id=%s", workflow_id)

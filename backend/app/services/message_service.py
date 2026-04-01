@@ -13,22 +13,29 @@ async def store_message(
     to_phone: str,
     body: str,
     media_urls: list[dict],
+    messaging_service_sid: str | None = None,
 ) -> dict:
     """Store an inbound message. Returns message_id, company_id, customer_id.
 
-    Uses system session first to look up tenant by phone number,
-    then stores under the correct tenant context.
+    Uses system session first to look up tenant by phone number or
+    messaging service SID, then stores under the correct tenant context.
     """
+    from sqlalchemy import or_
+
     company_id = ""
     customer_id = None
 
-    # Look up which company owns the 'to' phone number, and which customer is texting
+    # Look up which company owns the 'to' phone number or messaging service
     async with get_system_session() as session:
-        # Find company by Twilio phone number
         from app.models.company import Company
 
+        # Try matching by phone number OR messaging service SID
+        conditions = [Company.twilio_phone_number == to_phone]
+        if messaging_service_sid:
+            conditions.append(Company.twilio_messaging_service_sid == messaging_service_sid)
+
         result = await session.execute(
-            select(Company).where(Company.twilio_phone_number == to_phone)
+            select(Company).where(or_(*conditions))
         )
         company = result.scalar_one_or_none()
         if company:
@@ -44,8 +51,15 @@ async def store_message(
                 customer_id = str(customer.id)
 
     if not company_id:
-        # Unknown number — store with empty company_id for manual review
-        company_id = "__unknown__"
+        # No matching company found — return early with metadata for manual review
+        return {
+            "message_id": "",
+            "company_id": "",
+            "customer_id": None,
+            "status": "no_company_found",
+            "from_phone": from_phone,
+            "to_phone": to_phone,
+        }
 
     # Store the message under tenant context
     async with get_tenant_session(company_id) as session:
