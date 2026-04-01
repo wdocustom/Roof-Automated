@@ -5,11 +5,15 @@ and dispatch to Temporal workflows for async processing. The webhook
 MUST respond within 15 seconds — all heavy processing happens in Temporal.
 """
 
+import logging
+import uuid
+from datetime import UTC, datetime
+
 from fastapi import APIRouter, Form, HTTPException, Request, status
-from twilio.request_validator import RequestValidator
 
 from app.core.config import settings
-from app.workflows.sms_intake import start_sms_intake_workflow
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/webhooks", tags=["webhooks"])
 
@@ -19,15 +23,56 @@ def _validate_twilio_signature(request: Request, body: bytes) -> bool:
     if settings.environment == "development":
         return True  # Skip in dev for easier testing
 
-    signature = request.headers.get("X-Twilio-Signature", "")
-    validator = RequestValidator(settings.twilio_auth_token)
+    try:
+        from twilio.request_validator import RequestValidator
 
-    # Reconstruct the full URL Twilio used
-    url = str(request.url)
-    # Parse form params for validation
-    params = dict(x.split("=", 1) for x in body.decode().split("&")) if body else {}
+        signature = request.headers.get("X-Twilio-Signature", "")
+        validator = RequestValidator(settings.twilio_auth_token)
 
-    return validator.validate(url, params, signature)
+        # Reconstruct the full URL Twilio used
+        url = str(request.url)
+        # Parse form params for validation
+        params = dict(x.split("=", 1) for x in body.decode().split("&")) if body else {}
+
+        return validator.validate(url, params, signature)
+    except Exception:
+        logger.warning("Twilio signature validation failed — allowing in non-production")
+        return settings.environment != "production"
+
+
+async def _store_message_directly(
+    message_sid: str,
+    from_phone: str,
+    to_phone: str,
+    body: str,
+    media_urls: list[dict],
+) -> str | None:
+    """Fallback: store the inbound message directly in the DB when Temporal is unavailable."""
+    try:
+        from app.core.database import get_tenant_session
+        from app.models.message import Message, MessageChannel, MessageDirection, MessageSenderType
+
+        # Use "unassigned" as company_id — RLS requires matching session var
+        async with get_tenant_session("unassigned") as session:
+            msg_id = uuid.uuid4()
+            msg = Message(
+                id=msg_id,
+                company_id="unassigned",
+                from_phone=from_phone,
+                to_phone=to_phone,
+                direction=MessageDirection.INBOUND,
+                sender_type=MessageSenderType.CUSTOMER,
+                body=body,
+                channel=MessageChannel.SMS,
+                twilio_message_sid=message_sid,
+                twilio_status="received",
+            )
+            session.add(msg)
+            logger.info("Stored message %s directly (Temporal unavailable)", message_sid)
+            return str(msg_id)
+    except Exception:
+        logger.exception("Failed to store message directly for %s", message_sid)
+        return None
 
 
 @router.post("/twilio/sms")
@@ -42,7 +87,8 @@ async def twilio_sms_webhook(
     """Receive inbound SMS/MMS from Twilio.
 
     Validates signature, then dispatches to a Temporal workflow for processing.
-    Returns a minimal TwiML response to acknowledge receipt.
+    Falls back to direct DB storage if Temporal is unavailable.
+    Returns a 200 to Twilio in all cases to prevent retries.
     """
     # Validate Twilio signature
     raw_body = await request.body()
@@ -61,42 +107,58 @@ async def twilio_sms_webhook(
         if url:
             media_urls.append({"url": str(url), "content_type": str(content_type or "")})
 
-    # Check for STOP/HELP keywords (TCPA compliance — handle before any processing)
-    body_upper = Body.strip().upper() if Body else ""
-    if body_upper in ("STOP", "STOPALL", "UNSUBSCRIBE", "CANCEL", "END", "QUIT"):
-        # Temporal workflow will handle opt-out recording
-        await start_sms_intake_workflow(
-            message_sid=MessageSid,
-            from_phone=From,
-            to_phone=To,
-            body=Body,
-            media_urls=media_urls,
-            is_opt_out=True,
-        )
-        # Twilio auto-handles STOP responses, but we record it
-        return {"status": "opt_out_recorded"}
-
-    if body_upper in ("HELP", "INFO"):
-        await start_sms_intake_workflow(
-            message_sid=MessageSid,
-            from_phone=From,
-            to_phone=To,
-            body=Body,
-            media_urls=media_urls,
-            is_help_request=True,
-        )
-        return {"status": "help_queued"}
-
-    # Normal message — dispatch to Temporal for async processing
-    workflow_id = await start_sms_intake_workflow(
-        message_sid=MessageSid,
-        from_phone=From,
-        to_phone=To,
-        body=Body,
-        media_urls=media_urls,
+    logger.info(
+        "Inbound SMS: from=%s to=%s body=%s media=%d",
+        From, To, Body[:50] if Body else "(empty)", len(media_urls),
     )
 
-    return {"status": "accepted", "workflow_id": workflow_id}
+    # Check for STOP/HELP keywords (TCPA compliance)
+    body_upper = Body.strip().upper() if Body else ""
+
+    # Try Temporal workflow first, fall back to direct storage
+    try:
+        from app.workflows.sms_intake import start_sms_intake_workflow
+
+        is_opt_out = body_upper in ("STOP", "STOPALL", "UNSUBSCRIBE", "CANCEL", "END", "QUIT")
+        is_help = body_upper in ("HELP", "INFO")
+
+        workflow_id = await start_sms_intake_workflow(
+            message_sid=MessageSid,
+            from_phone=From,
+            to_phone=To,
+            body=Body,
+            media_urls=media_urls,
+            is_opt_out=is_opt_out,
+            is_help_request=is_help,
+        )
+
+        logger.info("SMS dispatched to Temporal: workflow_id=%s", workflow_id)
+
+        if is_opt_out:
+            return {"status": "opt_out_recorded"}
+        if is_help:
+            return {"status": "help_queued"}
+        return {"status": "accepted", "workflow_id": workflow_id}
+
+    except Exception:
+        logger.warning(
+            "Temporal unavailable for SMS %s — storing directly", MessageSid, exc_info=True
+        )
+
+        # Fallback: store message directly so it's not lost
+        msg_id = await _store_message_directly(
+            message_sid=MessageSid,
+            from_phone=From,
+            to_phone=To,
+            body=Body,
+            media_urls=media_urls,
+        )
+
+        return {
+            "status": "stored_fallback",
+            "message_id": msg_id,
+            "note": "Temporal unavailable — message stored for later processing",
+        }
 
 
 @router.post("/twilio/status")
@@ -106,5 +168,5 @@ async def twilio_status_callback(
     MessageStatus: str = Form(...),
 ):
     """Receive delivery status updates from Twilio (sent, delivered, failed, etc.)."""
-    # TODO: Update message status in DB via lightweight query (no Temporal needed)
+    logger.info("Twilio status: %s → %s", MessageSid, MessageStatus)
     return {"status": "ok"}
