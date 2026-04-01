@@ -39,6 +39,7 @@ from app.workflows.sms_intake import (
     SMSIntakeWorkflow,
     check_consent_status,
     handle_opt_out,
+    send_acknowledgment,
     send_help_response,
     store_inbound_message,
 )
@@ -76,6 +77,7 @@ async def run_worker() -> None:
             check_consent_status,
             handle_opt_out,
             send_help_response,
+            send_acknowledgment,
             # Phase 2: Agent dispatch
             determine_agent,
             run_lead_onboarding_agent,

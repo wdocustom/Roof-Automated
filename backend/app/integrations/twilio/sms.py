@@ -1,9 +1,15 @@
 """Twilio SMS/MMS sending — thin wrapper with retry logic."""
 
+import asyncio
+import functools
+
+import structlog
 from tenacity import retry, stop_after_attempt, wait_exponential
 from twilio.rest import Client
 
 from app.core.config import settings
+
+logger = structlog.get_logger()
 
 _twilio_client: Client | None = None
 
@@ -41,5 +47,13 @@ async def send_sms(
     if media_urls:
         kwargs["media_url"] = media_urls
 
-    message = client.messages.create(**kwargs)
+    logger.info("twilio_send_sms", to=to, from_=from_, body_len=len(body))
+
+    # Twilio's Python SDK is synchronous — run in executor to avoid blocking
+    loop = asyncio.get_event_loop()
+    message = await loop.run_in_executor(
+        None, functools.partial(client.messages.create, **kwargs)
+    )
+
+    logger.info("twilio_send_sms_ok", sid=message.sid, to=to)
     return message.sid

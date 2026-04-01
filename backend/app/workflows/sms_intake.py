@@ -166,7 +166,14 @@ class SMSIntakeWorkflow:
                     "message_id": store_result.get("message_id"),
                 }
 
-        # 5. Dispatch to LangGraph agent via Agent Dispatch Workflow
+        # 5. Send immediate acknowledgment so the customer knows we got it
+        await workflow.execute_activity(
+            send_acknowledgment,
+            args=[input.from_phone, input.to_phone, len(input.media_urls) > 0],
+            start_to_close_timeout=timedelta(seconds=15),
+        )
+
+        # 6. Dispatch to LangGraph agent via Agent Dispatch Workflow
         from app.workflows.agent_dispatch import AgentDispatchInput, AgentDispatchWorkflow
 
         agent_input = AgentDispatchInput(
@@ -178,12 +185,20 @@ class SMSIntakeWorkflow:
             message_id=store_result.get("message_id", ""),
         )
 
-        agent_result = await workflow.execute_child_workflow(
-            AgentDispatchWorkflow.run,
-            agent_input,
-            id=f"agent-dispatch-{input.message_sid}",
-            task_queue=settings.temporal_task_queue,
-        )
+        try:
+            agent_result = await workflow.execute_child_workflow(
+                AgentDispatchWorkflow.run,
+                agent_input,
+                id=f"agent-dispatch-{input.message_sid}",
+                task_queue=settings.temporal_task_queue,
+            )
+        except Exception:
+            # Agent dispatch failed — acknowledgment was already sent
+            return {
+                "status": "agent_failed",
+                "message_id": store_result.get("message_id"),
+                "company_id": company_id,
+            }
 
         return {
             "status": "processed",

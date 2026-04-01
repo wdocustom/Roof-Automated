@@ -15,7 +15,10 @@ workflow history for full visibility.
 from dataclasses import dataclass
 from datetime import timedelta
 
+import structlog
 from temporalio import activity, workflow
+
+logger = structlog.get_logger()
 
 # ---------------------------------------------------------------------------
 # Input/Output
@@ -103,6 +106,7 @@ async def determine_agent(input: AgentDispatchInput) -> str:
 @activity.defn
 async def run_lead_onboarding_agent(input: AgentDispatchInput) -> dict:
     """Run the Lead Onboarding Agent (LangGraph) as a Temporal Activity."""
+    logger.info("lead_onboarding_start", company_id=input.company_id, phone=input.customer_phone)
     from app.agents.graphs.lead_onboarding import lead_onboarding_graph
 
     # Build initial state
@@ -136,7 +140,17 @@ async def run_lead_onboarding_agent(input: AgentDispatchInput) -> dict:
     }
 
     # Run the graph
-    result = await lead_onboarding_graph.ainvoke(state)
+    try:
+        result = await lead_onboarding_graph.ainvoke(state)
+    except Exception:
+        logger.exception("lead_onboarding_graph_failed", company_id=input.company_id)
+        raise
+
+    logger.info(
+        "lead_onboarding_done",
+        response_text=result.get("response_text", "")[:100],
+        stage=result.get("stage", ""),
+    )
 
     return {
         "agent_name": "lead_onboarding",
