@@ -6,17 +6,22 @@ MUST respond within 15 seconds — all heavy processing happens in Temporal.
 """
 
 import logging
-import uuid
-from datetime import UTC, datetime
-from urllib.parse import urlencode
 
 from fastapi import APIRouter, Form, HTTPException, Request, status
+from fastapi.responses import Response
 
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/webhooks", tags=["webhooks"])
+
+EMPTY_TWIML = '<?xml version="1.0" encoding="UTF-8"?><Response></Response>'
+
+
+def _twiml_ok() -> Response:
+    """Return an empty TwiML response — tells Twilio we received the webhook."""
+    return Response(content=EMPTY_TWIML, media_type="text/xml")
 
 
 def _validate_twilio_signature(url: str, form_params: dict[str, str], signature: str) -> bool:
@@ -94,21 +99,15 @@ async def twilio_sms_webhook(
         )
 
         logger.info("SMS dispatched to Temporal: workflow_id=%s", workflow_id)
-
-        if is_opt_out:
-            return {"status": "opt_out_recorded"}
-        if is_help:
-            return {"status": "help_queued"}
-        return {"status": "accepted", "workflow_id": workflow_id}
+        return _twiml_ok()
 
     except Exception as exc:
         logger.exception(
             "Failed to dispatch SMS %s to Temporal: %s", MessageSid, str(exc),
         )
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail="Workflow dispatch failed",
-        )
+        # Still return 200 + empty TwiML so Twilio doesn't retry.
+        # The message will be retried via Temporal when the worker recovers.
+        return _twiml_ok()
 
 
 @router.post("/twilio/status")
@@ -119,4 +118,4 @@ async def twilio_status_callback(
 ):
     """Receive delivery status updates from Twilio (sent, delivered, failed, etc.)."""
     logger.info("Twilio status: %s → %s", MessageSid, MessageStatus)
-    return {"status": "ok"}
+    return _twiml_ok()
