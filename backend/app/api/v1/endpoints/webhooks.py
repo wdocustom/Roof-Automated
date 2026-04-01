@@ -8,6 +8,7 @@ MUST respond within 15 seconds — all heavy processing happens in Temporal.
 import logging
 import uuid
 from datetime import UTC, datetime
+from urllib.parse import urlencode
 
 from fastapi import APIRouter, Form, HTTPException, Request, status
 
@@ -18,7 +19,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/webhooks", tags=["webhooks"])
 
 
-def _validate_twilio_signature(request: Request, body: bytes) -> bool:
+def _validate_twilio_signature(url: str, form_params: dict[str, str], signature: str) -> bool:
     """Validate that the request genuinely came from Twilio."""
     if settings.environment == "development":
         return True  # Skip in dev for easier testing
@@ -26,53 +27,11 @@ def _validate_twilio_signature(request: Request, body: bytes) -> bool:
     try:
         from twilio.request_validator import RequestValidator
 
-        signature = request.headers.get("X-Twilio-Signature", "")
         validator = RequestValidator(settings.twilio_auth_token)
-
-        # Reconstruct the full URL Twilio used
-        url = str(request.url)
-        # Parse form params for validation
-        params = dict(x.split("=", 1) for x in body.decode().split("&")) if body else {}
-
-        return validator.validate(url, params, signature)
+        return validator.validate(url, form_params, signature)
     except Exception:
         logger.warning("Twilio signature validation failed — allowing in non-production")
         return settings.environment != "production"
-
-
-async def _store_message_directly(
-    message_sid: str,
-    from_phone: str,
-    to_phone: str,
-    body: str,
-    media_urls: list[dict],
-) -> str | None:
-    """Fallback: store the inbound message directly in the DB when Temporal is unavailable."""
-    try:
-        from app.core.database import get_tenant_session
-        from app.models.message import Message, MessageChannel, MessageDirection, MessageSenderType
-
-        # Use "unassigned" as company_id — RLS requires matching session var
-        async with get_tenant_session("unassigned") as session:
-            msg_id = uuid.uuid4()
-            msg = Message(
-                id=msg_id,
-                company_id="unassigned",
-                from_phone=from_phone,
-                to_phone=to_phone,
-                direction=MessageDirection.INBOUND,
-                sender_type=MessageSenderType.CUSTOMER,
-                body=body,
-                channel=MessageChannel.SMS,
-                twilio_message_sid=message_sid,
-                twilio_status="received",
-            )
-            session.add(msg)
-            logger.info("Stored message %s directly (Temporal unavailable)", message_sid)
-            return str(msg_id)
-    except Exception:
-        logger.exception("Failed to store message directly for %s", message_sid)
-        return None
 
 
 @router.post("/twilio/sms")
@@ -87,19 +46,21 @@ async def twilio_sms_webhook(
     """Receive inbound SMS/MMS from Twilio.
 
     Validates signature, then dispatches to a Temporal workflow for processing.
-    Falls back to direct DB storage if Temporal is unavailable.
     Returns a 200 to Twilio in all cases to prevent retries.
     """
-    # Validate Twilio signature
-    raw_body = await request.body()
-    if not _validate_twilio_signature(request, raw_body):
+    # Validate Twilio signature using parsed form data (not raw body,
+    # which is already consumed by FastAPI's Form() parameter parsing).
+    form_data = await request.form()
+    form_params = {k: str(v) for k, v in form_data.items()}
+    signature = request.headers.get("X-Twilio-Signature", "")
+
+    if not _validate_twilio_signature(str(request.url), form_params, signature):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Invalid Twilio signature",
         )
 
     # Collect media URLs if present
-    form_data = await request.form()
     media_urls = []
     for i in range(NumMedia):
         url = form_data.get(f"MediaUrl{i}")
@@ -115,7 +76,7 @@ async def twilio_sms_webhook(
     # Check for STOP/HELP keywords (TCPA compliance)
     body_upper = Body.strip().upper() if Body else ""
 
-    # Try Temporal workflow first, fall back to direct storage
+    # Dispatch to Temporal workflow
     try:
         from app.workflows.sms_intake import start_sms_intake_workflow
 
@@ -140,25 +101,14 @@ async def twilio_sms_webhook(
             return {"status": "help_queued"}
         return {"status": "accepted", "workflow_id": workflow_id}
 
-    except Exception:
-        logger.warning(
-            "Temporal unavailable for SMS %s — storing directly", MessageSid, exc_info=True
+    except Exception as exc:
+        logger.exception(
+            "Failed to dispatch SMS %s to Temporal: %s", MessageSid, str(exc),
         )
-
-        # Fallback: store message directly so it's not lost
-        msg_id = await _store_message_directly(
-            message_sid=MessageSid,
-            from_phone=From,
-            to_phone=To,
-            body=Body,
-            media_urls=media_urls,
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Workflow dispatch failed",
         )
-
-        return {
-            "status": "stored_fallback",
-            "message_id": msg_id,
-            "note": "Temporal unavailable — message stored for later processing",
-        }
 
 
 @router.post("/twilio/status")

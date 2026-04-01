@@ -7,6 +7,10 @@ Start with: python -m app.workflows.worker
 import asyncio
 
 from temporalio.worker import Worker
+from temporalio.worker.workflow_sandbox import (
+    SandboxedWorkflowRunner,
+    SandboxRestrictions,
+)
 
 from app.core.config import settings
 
@@ -44,6 +48,17 @@ async def run_worker() -> None:
     """Connect to Temporal and start processing workflows."""
     client = await get_temporal_client()
 
+    # Allow pydantic-settings and app.core.config through the Temporal
+    # workflow sandbox.  pydantic-settings calls Path.expanduser() to
+    # locate .env files, which is forbidden inside the default sandbox.
+    sandbox_runner = SandboxedWorkflowRunner(
+        restrictions=SandboxRestrictions.default.with_passthrough_modules(
+            "pydantic",
+            "pydantic_settings",
+            "app",
+        )
+    )
+
     worker = Worker(
         client,
         task_queue=settings.temporal_task_queue,
@@ -73,6 +88,7 @@ async def run_worker() -> None:
             run_payment_agent,
             log_lifecycle_event,
         ],
+        workflow_runner=sandbox_runner,
     )
 
     print(f"Temporal worker started on queue: {settings.temporal_task_queue}")
