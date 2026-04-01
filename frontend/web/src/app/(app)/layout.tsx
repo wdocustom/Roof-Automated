@@ -1,8 +1,8 @@
-import { Sidebar } from "@/components/sidebar";
+import { TopNav } from "@/components/top-nav";
 import { auth } from "@/lib/auth/server";
 import { redirect } from "next/navigation";
 
-export default async function AgentsLayout({
+export default async function AppLayout({
   children,
 }: {
   children: React.ReactNode;
@@ -14,8 +14,8 @@ export default async function AgentsLayout({
   }
 
   return (
-    <div className="flex min-h-full w-full">
-      <Sidebar />
+    <div className="min-h-full flex flex-col">
+      <TopNav />
       <main className="flex-1 overflow-auto">{children}</main>
     </div>
   );
