@@ -351,6 +351,39 @@ async def generate_estimate(state: LeadState) -> dict:
     }
 
 
+async def generate_sow_node(state: LeadState) -> dict:
+    """Generate a structured Scope of Work using Gemma 4.
+
+    Runs after estimate generation. The SOW is saved to the project
+    and will be rendered into the contract HTML when the contract is generated.
+    """
+    project_id = state.get("project_id")
+    company_id = state.get("company_id")
+
+    if not project_id or not company_id:
+        return {}
+
+    try:
+        from app.services.sow_generator import generate_sow
+
+        result = await generate_sow(company_id=company_id, project_id=project_id)
+        return {
+            "actions": [
+                {
+                    "action": "sow_generated",
+                    "line_items": len(result.get("sow", {}).get("line_items", [])),
+                    "model": result.get("model", ""),
+                }
+            ],
+        }
+    except Exception as e:
+        # SOW generation is non-critical — don't block the pipeline
+        import logging
+
+        logging.getLogger(__name__).warning("SOW generation failed: %s", e)
+        return {}
+
+
 async def check_human_review(state: LeadState) -> dict:
     """Check if this estimate needs human review before presenting.
 
@@ -524,7 +557,9 @@ def build_lead_onboarding_graph() -> StateGraph:
         },
     )
 
-    graph.add_edge("estimate", "check_review")
+    graph.add_node("generate_sow", generate_sow_node)
+    graph.add_edge("estimate", "generate_sow")
+    graph.add_edge("generate_sow", "check_review")
 
     graph.add_conditional_edges(
         "check_review",

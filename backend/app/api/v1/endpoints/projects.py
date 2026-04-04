@@ -212,6 +212,54 @@ async def seed_project(
         return ProjectResponse.model_validate(project)
 
 
+@router.post("/{project_id}/generate-sow")
+async def generate_sow_endpoint(
+    project_id: uuid.UUID,
+    company_id: str = Depends(get_company_id),
+):
+    """Generate a structured Scope of Work using Gemma 4 AI.
+
+    Analyzes the project type, measurements, and description to produce
+    an itemized SOW with line items, exclusions, assumptions, and warranty.
+    """
+    from app.services.sow_generator import generate_sow
+
+    try:
+        result = await generate_sow(company_id=company_id, project_id=str(project_id))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.exception("SOW generation failed for project %s", project_id)
+        raise HTTPException(status_code=500, detail=f"SOW generation failed: {e}")
+
+    return result
+
+
+@router.get("/{project_id}/sow")
+async def get_sow(
+    project_id: uuid.UUID,
+    company_id: str = Depends(get_company_id),
+):
+    """Get the stored Scope of Work for a project."""
+    async with get_tenant_session(company_id) as session:
+        result = await session.execute(
+            select(Project).where(Project.id == project_id)
+        )
+        project = result.scalar_one_or_none()
+        if not project:
+            raise HTTPException(status_code=404, detail="Project not found")
+
+        if not project.sow_json:
+            raise HTTPException(status_code=404, detail="No SOW generated yet")
+
+        import json as json_mod
+
+        return {
+            "project_id": str(project_id),
+            "sow": json_mod.loads(project.sow_json),
+        }
+
+
 @router.get("/{project_id}", response_model=ProjectResponse)
 async def get_project(
     project_id: uuid.UUID,

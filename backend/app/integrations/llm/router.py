@@ -5,11 +5,12 @@ This layer exists to:
   2. Implement tiered model selection (fast/cheap for routing, powerful for reasoning)
   3. Enable semantic caching via pgvector
   4. Enforce per-tenant token budgets and rate limiting
-  5. Provide multi-provider failover (OpenAI ↔ Anthropic)
+  5. Provide multi-provider failover (OpenAI ↔ Anthropic ↔ Gemma)
 
 All LLM calls in the platform MUST go through this router.
 """
 
+import json
 import time
 from dataclasses import dataclass, field
 from enum import StrEnum
@@ -29,7 +30,9 @@ class ModelTier(StrEnum):
     FAST = "fast"  # Classification, routing, simple parsing (Haiku / GPT-4o-mini)
     STANDARD = "standard"  # Most agent tasks (Sonnet / GPT-4o)
     POWERFUL = "powerful"  # Complex reasoning, reflection (Opus / GPT-4o)
-    VISION = "vision"  # Image analysis (GPT-4o / Claude vision)
+    VISION = "vision"  # Image analysis — customer-facing (Gemini / GPT-4o)
+    VISION_QC = "vision_qc"  # QC photo analysis — high volume (Gemma 4 / Gemini fallback)
+    SOW = "sow"  # Structured SOW generation (Gemma 4 / Haiku fallback)
 
 
 # Default model mapping — override via config
@@ -51,6 +54,14 @@ DEFAULT_MODELS: dict[ModelTier, list[str]] = {
         "openai/gpt-4o",
         "anthropic/claude-sonnet-4-6",
     ],
+    ModelTier.VISION_QC: [
+        "google/gemma-4-31b",  # Gemma 4 via Google AI Studio — 95% cheaper
+        "gemini/gemini-2.5-pro",  # Fallback to current
+    ],
+    ModelTier.SOW: [
+        "google/gemma-4-27b",  # Structured JSON output, fine-tunable
+        "anthropic/claude-haiku-4-5-20251001",  # Fallback
+    ],
 }
 
 
@@ -66,6 +77,13 @@ class LLMResponse:
     cached: bool = False
     metadata: dict = field(default_factory=dict)
 
+    def json(self) -> dict | None:
+        """Try to parse content as JSON. Returns None if not valid JSON."""
+        try:
+            return json.loads(self.content)
+        except (json.JSONDecodeError, TypeError):
+            return None
+
 
 @dataclass
 class LLMRequest:
@@ -77,6 +95,7 @@ class LLMRequest:
     max_tokens: int = 1024
     tenant_id: str | None = None
     cache_key: str | None = None  # If set, attempt semantic cache lookup
+    response_format: dict | None = None  # {"type": "json_object"} for structured output
 
 
 class LLMRouter:
@@ -96,12 +115,19 @@ class LLMRouter:
         for model in models:
             try:
                 start = time.monotonic()
-                response = await litellm.acompletion(
-                    model=model,
-                    messages=request.messages,
-                    temperature=request.temperature,
-                    max_tokens=request.max_tokens,
-                )
+
+                kwargs: dict = {
+                    "model": model,
+                    "messages": request.messages,
+                    "temperature": request.temperature,
+                    "max_tokens": request.max_tokens,
+                }
+
+                # Pass response_format for structured output (JSON mode)
+                if request.response_format:
+                    kwargs["response_format"] = request.response_format
+
+                response = await litellm.acompletion(**kwargs)
                 elapsed_ms = (time.monotonic() - start) * 1000
 
                 content = response.choices[0].message.content or ""
@@ -115,6 +141,7 @@ class LLMRouter:
                     output_tokens=usage.completion_tokens,
                     latency_ms=round(elapsed_ms, 1),
                     tenant_id=request.tenant_id,
+                    json_mode=request.response_format is not None,
                 )
 
                 return LLMResponse(

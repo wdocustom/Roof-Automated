@@ -73,6 +73,7 @@ class Project(BaseModel, TenantMixin):
     )
     description: Mapped[str | None] = mapped_column(Text)
     combo_details: Mapped[str | None] = mapped_column(Text)  # JSON: ["roof_replacement","gutters"]
+    sow_json: Mapped[str | None] = mapped_column(Text)  # Structured SOW from Gemma 4
 
     # Estimate & pricing
     estimated_sqft: Mapped[float | None] = mapped_column(Float)

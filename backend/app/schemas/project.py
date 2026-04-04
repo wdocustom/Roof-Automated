@@ -59,6 +59,7 @@ class ProjectResponse(BaseModel):
     status: ProjectStatus
     description: str | None
     combo_details: str | None = None
+    sow_json: str | None = None
     estimated_sqft: float | None
     estimate_low: float | None
     estimate_high: float | None

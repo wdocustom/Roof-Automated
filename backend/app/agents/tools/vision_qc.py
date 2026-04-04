@@ -83,18 +83,20 @@ async def compare_photo_to_spec(
         system_prompt += f"\nProperty Specifications:\n{spec_context}\n"
 
     system_prompt += (
-        "\nAssess the following and respond with each field on its own line as 'field: value':\n"
-        "1. spec_match_score: How well does the visible work match the specs? (0.0 to 1.0)\n"
-        "2. facets_visible: How many distinct roof facets/sections are visible?\n"
-        "3. ridge_cap_quality: Quality of ridge cap installation (good/fair/poor/not_visible)\n"
-        "4. flashing_quality: Quality of visible flashing (good/fair/poor/not_visible)\n"
-        "5. drip_edge_visible: Is drip edge properly installed? (yes/no/not_visible)\n"
-        "6. shingle_alignment: Are shingles properly aligned? (good/fair/poor/not_visible)\n"
-        "7. debris_present: Is construction debris visible? (yes/no)\n"
-        "8. issues: List any specific issues (comma-separated)\n"
-        "9. recommendation: approve / flag_for_review / reject\n"
-        "10. confidence: Your confidence in this assessment (0.0 to 1.0)\n"
-        "11. notes: Additional observations\n\n"
+        "\nYou MUST respond with a JSON object containing these fields:\n"
+        "{\n"
+        '  "spec_match_score": <float 0.0-1.0, how well visible work matches specs>,\n'
+        '  "facets_visible": <int, distinct roof facets/sections visible>,\n'
+        '  "ridge_cap_quality": "<good|fair|poor|not_visible>",\n'
+        '  "flashing_quality": "<good|fair|poor|not_visible>",\n'
+        '  "drip_edge_visible": "<yes|no|not_visible>",\n'
+        '  "shingle_alignment": "<good|fair|poor|not_visible>",\n'
+        '  "debris_present": <boolean>,\n'
+        '  "issues": ["issue1", "issue2"],\n'
+        '  "recommendation": "<approve|flag_for_review|reject>",\n'
+        '  "confidence": <float 0.0-1.0>,\n'
+        '  "notes": "<additional observations>"\n'
+        "}\n\n"
         "Be conservative — flag for review if uncertain rather than approving."
     )
 
@@ -110,15 +112,18 @@ async def compare_photo_to_spec(
                     ],
                 },
             ],
-            tier=ModelTier.VISION,
+            tier=ModelTier.VISION_QC,
             max_tokens=800,
             tenant_id=tenant_id,
+            response_format={"type": "json_object"},
         )
     )
 
-    from app.agents.tools.vision import _parse_vision_response
-
-    analysis = _parse_vision_response(response.content)
+    # Try JSON parse first (Gemma 4), fall back to text parse
+    analysis = response.json()
+    if not analysis:
+        from app.agents.tools.vision import _parse_vision_response
+        analysis = _parse_vision_response(response.content)
 
     # Build structured annotations for ML training
     annotations = {

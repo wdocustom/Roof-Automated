@@ -90,6 +90,7 @@ async def generate_contract(
             contract_amount=amount,
             payment_schedule=schedule,
             description=project.description or "",
+            sow_json=project.sow_json,
         )
 
         # Create contract record
@@ -374,6 +375,21 @@ async def sign_contract(token: str, signer_name: str, signer_ip: str) -> dict:
     }
 
 
+def _render_sow_section(sow_json: str | None, description: str) -> str:
+    """Render the SOW section for the contract HTML.
+
+    If a structured SOW exists (from Gemma 4), render the itemized table.
+    Otherwise fall back to the plain description text.
+    """
+    if sow_json:
+        from app.services.sow_generator import render_sow_html
+
+        return render_sow_html(sow_json)
+    if description:
+        return f"<p>{description}</p>"
+    return ""
+
+
 def _build_contract_html(
     company_name: str,
     company_phone: str,
@@ -390,6 +406,7 @@ def _build_contract_html(
     contract_amount: float,
     payment_schedule: list[dict],
     description: str,
+    sow_json: str | None = None,
 ) -> str:
     """Build the contract HTML content.
 
@@ -428,7 +445,7 @@ def _build_contract_html(
 
 <h3>Scope of Work</h3>
 <p><strong>Project Type:</strong> {project_type}</p>
-{f"<p>{description}</p>" if description else ""}
+{_render_sow_section(sow_json, description)}
 <p>Contractor agrees to furnish all labor, materials, equipment, and supervision
 necessary to complete the above-described work at the property address in a
 professional and workmanlike manner, in accordance with applicable building codes

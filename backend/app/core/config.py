@@ -46,6 +46,10 @@ class Settings(BaseSettings):
     langchain_api_key: str = ""
     langchain_project: str = "roof-automated"
 
+    # -- Gemma 4 / Self-hosted LLM --
+    ollama_base_url: str = ""  # e.g. http://gpu-server:11434
+    google_ai_studio_api_key: str = ""  # For Gemma 4 via Google AI Studio
+
     # -- Frontend --
     frontend_url: str = "https://roof-automated.vercel.app"
 
