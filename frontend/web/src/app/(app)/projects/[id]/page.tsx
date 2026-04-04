@@ -19,10 +19,20 @@ import {
   Send,
   Loader2,
   CreditCard,
+  FileSignature,
 } from "lucide-react";
 import { clsx } from "clsx";
 import Link from "next/link";
-import { fetchProject, updateProject, sendMessage, sendInvoice } from "@/lib/api";
+import {
+  fetchProject,
+  updateProject,
+  sendMessage,
+  sendInvoice,
+  generateContract,
+  sendContract,
+  listProjectContracts,
+  type ContractSummary,
+} from "@/lib/api";
 
 const statusColors: Record<string, string> = {
   lead: "bg-gray-100 text-gray-700",
@@ -97,6 +107,31 @@ export default function ProjectDetailPage() {
       queryClient.invalidateQueries({ queryKey: ["project", id] });
       setInvoiceSent(true);
       setTimeout(() => setInvoiceSent(false), 5000);
+    },
+  });
+
+  // Contract state
+  const [contractSent, setContractSent] = useState(false);
+
+  const { data: contracts } = useQuery({
+    queryKey: ["contracts", id],
+    queryFn: () => listProjectContracts(id),
+  });
+
+  const latestContract = contracts?.[0];
+
+  const contractMutation = useMutation({
+    mutationFn: async () => {
+      // Generate contract, then send it
+      const generated = await generateContract(id);
+      await sendContract(generated.contract_id);
+      return generated;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["project", id] });
+      queryClient.invalidateQueries({ queryKey: ["contracts", id] });
+      setContractSent(true);
+      setTimeout(() => setContractSent(false), 5000);
     },
   });
 
@@ -377,6 +412,74 @@ export default function ProjectDetailPage() {
                   Send SMS
                 </button>
               </form>
+            </div>
+          )}
+
+          {/* Contract / E-Sign */}
+          {project.customer?.phone && (project.contract_amount || project.estimate_high || project.estimate_low) && (
+            <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+              <h3 className="text-sm font-semibold text-gray-900 flex items-center gap-2 mb-3">
+                <FileSignature className="h-4 w-4 text-gray-400" /> Contract
+              </h3>
+
+              {latestContract ? (
+                <div className="space-y-2 mb-3">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-gray-500">Status</span>
+                    <span className={clsx(
+                      "inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium",
+                      latestContract.status === "signed" ? "bg-green-100 text-green-700" :
+                      latestContract.status === "viewed" ? "bg-blue-100 text-blue-700" :
+                      latestContract.status === "sent" ? "bg-amber-100 text-amber-700" :
+                      "bg-gray-100 text-gray-700"
+                    )}>
+                      {latestContract.status.charAt(0).toUpperCase() + latestContract.status.slice(1)}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-gray-500">Amount</span>
+                    <span className="font-medium text-gray-900">{formatCurrency(latestContract.contract_amount)}</span>
+                  </div>
+                  {latestContract.signer_name && (
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-gray-500">Signed by</span>
+                      <span className="text-gray-900">{latestContract.signer_name}</span>
+                    </div>
+                  )}
+                  {latestContract.signed_at && (
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-gray-500">Signed</span>
+                      <span className="text-gray-900">{new Date(latestContract.signed_at).toLocaleDateString()}</span>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <p className="text-xs text-gray-500 mb-3">
+                  Generate and send a contract for the customer to e-sign on their phone.
+                </p>
+              )}
+
+              {contractSent && (
+                <p className="text-xs text-green-600 mb-2">Contract sent! Customer will receive an SMS with the signing link.</p>
+              )}
+              {contractMutation.isError && (
+                <p className="text-xs text-red-600 mb-2">Failed to generate/send contract.</p>
+              )}
+
+              {(!latestContract || latestContract.status !== "signed") && (
+                <button
+                  onClick={() => contractMutation.mutate()}
+                  disabled={contractMutation.isPending}
+                  className="w-full inline-flex items-center justify-center gap-2 rounded-lg bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50 transition-colors"
+                >
+                  {contractMutation.isPending ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <FileSignature className="h-4 w-4" />
+                  )}
+                  {latestContract ? "Resend Contract" : "Send Contract"}
+                </button>
+              )}
             </div>
           )}
 

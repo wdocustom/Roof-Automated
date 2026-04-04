@@ -235,6 +235,49 @@ export function sendInvoice(projectId: string) {
   });
 }
 
+// ── Contracts ──────────────────────────────────────────────
+
+export interface ContractSummary {
+  contract_id: string;
+  token: string;
+  status: string;
+  contract_amount: number;
+  signer_name: string | null;
+  signed_at: string | null;
+  created_at: string;
+}
+
+export interface GenerateContractResponse {
+  contract_id: string;
+  token: string;
+  status: string;
+  contract_amount: number;
+}
+
+export function generateContract(projectId: string, contractAmount?: number) {
+  return apiFetch<GenerateContractResponse>(
+    `/projects/${projectId}/generate-contract`,
+    {
+      method: "POST",
+      body: JSON.stringify({
+        project_id: projectId,
+        ...(contractAmount ? { contract_amount: contractAmount } : {}),
+      }),
+    }
+  );
+}
+
+export function sendContract(contractId: string) {
+  return apiFetch<{ status: string; twilio_sid: string }>(
+    `/contracts/${contractId}/send`,
+    { method: "POST" }
+  );
+}
+
+export function listProjectContracts(projectId: string) {
+  return apiFetch<ContractSummary[]>(`/projects/${projectId}/contracts`);
+}
+
 export function createProject(data: ProjectCreateRequest) {
   return apiFetch<Project>("/projects", {
     method: "POST",
