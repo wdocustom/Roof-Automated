@@ -319,7 +319,7 @@ export default function ProjectsPage() {
               </button>
             </div>
 
-            <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
+            <form id="new-project-form" onSubmit={handleSubmit} className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
               {error && (
                 <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">
                   {error}
@@ -470,24 +470,26 @@ export default function ProjectsPage() {
                 />
               </div>
 
-              {/* Actions — sticky footer so always visible on mobile */}
-              <div className="flex justify-end gap-3 sticky bottom-0 bg-white border-t border-gray-200 -mx-6 px-6 py-4 -mb-5 rounded-b-xl">
-                <button
-                  type="button"
-                  onClick={() => { setShowModal(false); resetForm(); }}
-                  className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={mutation.isPending || selectedServices.length === 0}
-                  className="px-4 py-2 rounded-lg bg-orange-600 text-sm font-medium text-white hover:bg-orange-700 disabled:opacity-50 transition-colors"
-                >
-                  {mutation.isPending ? "Creating..." : "Create Project"}
-                </button>
-              </div>
             </form>
+
+            {/* Actions — pinned outside scroll area so always visible */}
+            <div className="flex justify-end gap-3 border-t border-gray-200 px-6 py-4">
+              <button
+                type="button"
+                onClick={() => { setShowModal(false); resetForm(); }}
+                className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                form="new-project-form"
+                disabled={mutation.isPending || selectedServices.length === 0}
+                className="px-4 py-2 rounded-lg bg-orange-600 text-sm font-medium text-white hover:bg-orange-700 disabled:opacity-50 transition-colors"
+              >
+                {mutation.isPending ? "Creating..." : "Create Project"}
+              </button>
+            </div>
           </div>
         </div>
       )}
