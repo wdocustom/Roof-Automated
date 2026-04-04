@@ -97,59 +97,70 @@ async def classify_and_respond(state: EngagementState) -> dict:
             f"Contract: ${project_ctx.get('contract_amount', 0):,.0f}"
         )
 
-    response = await llm_router.complete(
-        LLMRequest(
-            messages=[
-                {
-                    "role": "system",
-                    "content": (
-                        "You are a friendly, professional roofing/siding company assistant "
-                        "communicating via text message. You represent the company and help "
-                        "customers with their ongoing project.\n\n"
-                        f"Project Info:\n{project_summary}\n\n"
-                        f"Recent Conversation:\n{recent_messages}\n\n"
-                        "Rules:\n"
-                        "- Keep responses SHORT (under 300 chars for SMS)\n"
-                        "- Be warm, professional, and reassuring\n"
-                        "- If the customer has a pricing objection, acknowledge it empathetically "
-                        "and explain the value (quality materials, warranty, licensed crew)\n"
-                        "- If they ask about financing or payment plans, mention milestone-based "
-                        "payments (deposit, progress, final) and that we accept all major cards\n"
-                        "- If they mention insurance, note that we work with insurance claims "
-                        "and can help with documentation, but flag for human follow-up\n"
-                        "- If they ask about timing/schedule, give the project status\n"
-                        "- If they seem upset or the topic is complex (insurance, legal, major "
-                        "scope change), flag for escalation\n"
-                        "- Look for natural upsell moments (ice shield, gutter guards, "
-                        "ridge vent upgrade) but don't be pushy\n\n"
-                        "Respond in this format:\n"
-                        "INTENT: question|objection|confirmation|scheduling|upsell_opportunity|complaint|other\n"
-                        "RESPONSE: <your message to the customer>\n"
-                        "NEEDS_ESCALATION: yes|no\n"
-                        "ESCALATION_REASON: <reason or empty>\n"
-                        "UPSELL: <product or empty>\n"
-                        "CONFIDENCE: <0.0 to 1.0>"
-                    ),
-                },
-                {"role": "user", "content": state["current_input"]},
-            ],
-            tier=ModelTier.STANDARD,
-            temperature=0.4,
-            max_tokens=500,
-            tenant_id=state.get("company_id"),
+    try:
+        response = await llm_router.complete(
+            LLMRequest(
+                messages=[
+                    {
+                        "role": "system",
+                        "content": (
+                            "You are a friendly, professional roofing/siding company assistant "
+                            "communicating via text message. You represent the company and help "
+                            "customers with their ongoing project.\n\n"
+                            f"Project Info:\n{project_summary}\n\n"
+                            f"Recent Conversation:\n{recent_messages}\n\n"
+                            "Rules:\n"
+                            "- Keep responses SHORT (under 300 chars for SMS)\n"
+                            "- Be warm, professional, and reassuring\n"
+                            "- If the customer has a pricing objection, acknowledge it empathetically "
+                            "and explain the value (quality materials, warranty, licensed crew)\n"
+                            "- If they ask about financing or payment plans, mention milestone-based "
+                            "payments (deposit, progress, final) and that we accept all major cards\n"
+                            "- If they mention insurance, note that we work with insurance claims "
+                            "and can help with documentation, but flag for human follow-up\n"
+                            "- If they ask about timing/schedule, give the project status\n"
+                            "- If they seem upset or the topic is complex (insurance, legal, major "
+                            "scope change), flag for escalation\n"
+                            "- Look for natural upsell moments (ice shield, gutter guards, "
+                            "ridge vent upgrade) but don't be pushy\n\n"
+                            "Respond in this format:\n"
+                            "INTENT: question|objection|confirmation|scheduling|upsell_opportunity|complaint|other\n"
+                            "RESPONSE: <your message to the customer>\n"
+                            "NEEDS_ESCALATION: yes|no\n"
+                            "ESCALATION_REASON: <reason or empty>\n"
+                            "UPSELL: <product or empty>\n"
+                            "CONFIDENCE: <0.0 to 1.0>"
+                        ),
+                    },
+                    {"role": "user", "content": state["current_input"]},
+                ],
+                tier=ModelTier.STANDARD,
+                temperature=0.4,
+                max_tokens=500,
+                tenant_id=state.get("company_id"),
+            )
         )
-    )
 
-    parsed = _parse_response(response.content)
+        parsed = _parse_response(response.content)
 
-    return {
-        "intent": parsed.get("intent", "other"),
-        "response_text": parsed.get("response", "Thanks for your message! We'll look into that."),
-        "needs_escalation": parsed.get("needs_escalation", "no").lower() == "yes",
-        "escalation_reason": parsed.get("escalation_reason", ""),
-        "upsell_offered": parsed.get("upsell", ""),
-        "confidence": float(parsed.get("confidence", "0.7")),
-    }
+        return {
+            "intent": parsed.get("intent", "other"),
+            "response_text": parsed.get("response", "Thanks for your message! We'll look into that."),
+            "needs_escalation": parsed.get("needs_escalation", "no").lower() == "yes",
+            "escalation_reason": parsed.get("escalation_reason", ""),
+            "upsell_offered": parsed.get("upsell", ""),
+            "confidence": float(parsed.get("confidence", "0.7")),
+        }
+    except Exception:
+        # LLM failure — send a safe fallback and flag for human follow-up
+        return {
+            "intent": "other",
+            "response_text": "Thanks for your message! A team member will follow up with you shortly.",
+            "needs_escalation": True,
+            "escalation_reason": "LLM processing failed — needs human follow-up",
+            "upsell_offered": "",
+            "confidence": 0.0,
+        }
 
 
 async def handle_upsell(state: EngagementState) -> dict:

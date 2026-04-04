@@ -98,31 +98,34 @@ async def classify_intent(state: LeadState) -> dict:
     if not text:
         return {"intent": "unknown", "next_action": "qualify"}
 
-    response = await llm_router.complete(
-        LLMRequest(
-            messages=[
-                {
-                    "role": "system",
-                    "content": (
-                        "Classify this customer message into one category:\n"
-                        "- new_lead: Wants a quote, estimate, or new roof/siding work\n"
-                        "- question: Has a question about pricing, process, or timeline\n"
-                        "- scheduling: Wants to schedule inspection or work\n"
-                        "- complaint: Has an issue or complaint\n"
-                        "- other: Doesn't fit above categories\n\n"
-                        "Respond with ONLY the category name."
-                    ),
-                },
-                {"role": "user", "content": text},
-            ],
-            tier=ModelTier.FAST,
-            temperature=0.0,
-            max_tokens=20,
-            tenant_id=state.get("company_id"),
+    try:
+        response = await llm_router.complete(
+            LLMRequest(
+                messages=[
+                    {
+                        "role": "system",
+                        "content": (
+                            "Classify this customer message into one category:\n"
+                            "- new_lead: Wants a quote, estimate, or new roof/siding work\n"
+                            "- question: Has a question about pricing, process, or timeline\n"
+                            "- scheduling: Wants to schedule inspection or work\n"
+                            "- complaint: Has an issue or complaint\n"
+                            "- other: Doesn't fit above categories\n\n"
+                            "Respond with ONLY the category name."
+                        ),
+                    },
+                    {"role": "user", "content": text},
+                ],
+                tier=ModelTier.FAST,
+                temperature=0.0,
+                max_tokens=20,
+                tenant_id=state.get("company_id"),
+            )
         )
-    )
+        intent = response.content.strip().lower()
+    except Exception:
+        intent = "new_lead"  # Default to qualifying on LLM failure
 
-    intent = response.content.strip().lower()
     return {"intent": intent, "next_action": "qualify"}
 
 
@@ -138,14 +141,15 @@ async def qualify_lead(state: LeadState) -> dict:
         for m in state.get("messages", [])[-6:]  # Last 6 messages for context
     )
 
-    response = await llm_router.complete(
-        LLMRequest(
-            messages=[
-                {
-                    "role": "system",
-                    "content": (
-                        "You are a friendly, professional roofing/siding company assistant. "
-                        "Your job is to qualify leads via text message.\n\n"
+    try:
+        response = await llm_router.complete(
+            LLMRequest(
+                messages=[
+                    {
+                        "role": "system",
+                        "content": (
+                            "You are a friendly, professional roofing/siding company assistant. "
+                            "Your job is to qualify leads via text message.\n\n"
                         f"Information gathered so far:\n"
                         f"- Address: {'Yes' if has_address else 'Not yet'}\n"
                         f"- Photos: {'Yes' if has_photos else 'Not yet'}\n"
@@ -176,6 +180,12 @@ async def qualify_lead(state: LeadState) -> dict:
             tenant_id=state.get("company_id"),
         )
     )
+
+    except Exception:
+        return {
+            "response_text": "Thanks for reaching out! Could you tell me what you need help with — roof, siding, or gutters?",
+            "stage": "qualifying",
+        }
 
     # Parse response
     parsed = _parse_agent_response(response.content)
@@ -235,13 +245,20 @@ async def analyze_photos(state: LeadState) -> dict:
 
 
 async def generate_estimate(state: LeadState) -> dict:
-    """Generate preliminary estimate from rate cards."""
+    """Generate preliminary estimate from rate cards.
+
+    Also persists the project and estimate to the database so
+    the dashboard/project list reflects reality.
+    """
+    import structlog
+
     from app.services.estimate_engine import (
         format_estimate_for_sms,
         generate_roof_estimate,
         generate_siding_estimate,
     )
 
+    _log = structlog.get_logger()
     company_id = state["company_id"]
     sqft = state.get("estimated_sqft", 0)
     project_type = state.get("project_type", "roof_replacement")
@@ -271,6 +288,56 @@ async def generate_estimate(state: LeadState) -> dict:
 
     estimate_text = format_estimate_for_sms(estimate)
 
+    # ── Persist project + estimate to DB ──────────────────────
+    project_id = state.get("project_id", "")
+    customer_id = state.get("customer_id", "")
+
+    try:
+        from app.agents.tools.project_tools import (
+            create_lead_project,
+            update_project_estimate,
+        )
+
+        # Create project if it doesn't exist yet
+        if not project_id and state.get("property_address"):
+            result = await create_lead_project.ainvoke(
+                {
+                    "company_id": company_id,
+                    "customer_phone": state["customer_phone"],
+                    "property_address": state.get("property_address", ""),
+                    "property_city": state.get("property_city", ""),
+                    "property_state": state.get("property_state", ""),
+                    "property_zip": state.get("property_zip", ""),
+                    "project_type": project_type,
+                    "description": f"Lead via SMS from {state['customer_phone']}",
+                    "lead_source": "sms",
+                }
+            )
+            project_id = result.get("project_id", "")
+            customer_id = result.get("customer_id", "")
+            _log.info("lead_project_created", project_id=project_id)
+
+        # Save estimate on the project
+        if project_id:
+            await update_project_estimate.ainvoke(
+                {
+                    "company_id": company_id,
+                    "project_id": project_id,
+                    "estimate_low": estimate.total_low,
+                    "estimate_high": estimate.total_high,
+                    "estimated_sqft": sqft,
+                }
+            )
+            _log.info(
+                "lead_estimate_saved",
+                project_id=project_id,
+                low=estimate.total_low,
+                high=estimate.total_high,
+            )
+    except Exception:
+        _log.exception("lead_persist_failed", company_id=company_id)
+        # Don't block the response — estimate was generated successfully
+
     return {
         "estimate_low": estimate.total_low,
         "estimate_high": estimate.total_high,
@@ -279,6 +346,8 @@ async def generate_estimate(state: LeadState) -> dict:
         "confidence": estimate.confidence,
         "response_text": estimate_text,
         "stage": "estimate_presented",
+        "project_id": project_id,
+        "customer_id": customer_id,
     }
 
 

@@ -103,11 +103,46 @@ async def determine_agent(input: AgentDispatchInput) -> str:
     return "onboarding"
 
 
+async def _load_message_history(company_id: str, phone: str, limit: int = 20) -> list[dict]:
+    """Load recent message history for a phone number from the DB."""
+    try:
+        from sqlalchemy import select
+
+        from app.core.database import get_tenant_session
+        from app.models.message import Message, MessageDirection
+
+        async with get_tenant_session(company_id) as session:
+            result = await session.execute(
+                select(Message)
+                .where(
+                    (Message.from_phone == phone) | (Message.to_phone == phone)
+                )
+                .order_by(Message.created_at.desc())
+                .limit(limit)
+            )
+            messages = list(reversed(result.scalars().all()))
+
+        history = []
+        for m in messages:
+            role = "user" if m.direction == MessageDirection.INBOUND else "assistant"
+            if m.body:
+                history.append({"role": role, "content": m.body})
+        return history
+    except Exception:
+        logger.warning("message_history_load_failed", phone=phone)
+        return []
+
+
 @activity.defn
 async def run_lead_onboarding_agent(input: AgentDispatchInput) -> dict:
     """Run the Lead Onboarding Agent (LangGraph) as a Temporal Activity."""
     logger.info("lead_onboarding_start", company_id=input.company_id, phone=input.customer_phone)
     from app.agents.graphs.lead_onboarding import lead_onboarding_graph
+
+    # Load conversation history for context
+    history = await _load_message_history(input.company_id, input.customer_phone)
+    # Append the current message
+    history.append({"role": "user", "content": input.message_body})
 
     # Build initial state
     state = {
@@ -116,7 +151,7 @@ async def run_lead_onboarding_agent(input: AgentDispatchInput) -> dict:
         "from_phone": input.from_phone,
         "current_input": input.message_body,
         "media_urls": input.media_urls,
-        "messages": [{"role": "user", "content": input.message_body}],
+        "messages": history,
         "stage": "new",
         "intent": "",
         "project_type": "",
@@ -173,6 +208,10 @@ async def run_customer_engagement_agent(input: AgentDispatchInput, project_id: s
     """Run the Customer Engagement Agent (LangGraph) as a Temporal Activity."""
     from app.agents.graphs.customer_engagement import customer_engagement_graph
 
+    # Load conversation history for context
+    history = await _load_message_history(input.company_id, input.customer_phone)
+    history.append({"role": "user", "content": input.message_body})
+
     state = {
         "company_id": input.company_id,
         "customer_phone": input.customer_phone,
@@ -180,7 +219,7 @@ async def run_customer_engagement_agent(input: AgentDispatchInput, project_id: s
         "project_id": project_id,
         "current_input": input.message_body,
         "media_urls": input.media_urls,
-        "messages": [{"role": "user", "content": input.message_body}],
+        "messages": history,
         "project_context": {},
         "intent": "",
         "response_text": "",
