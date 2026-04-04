@@ -46,6 +46,9 @@ class Settings(BaseSettings):
     langchain_api_key: str = ""
     langchain_project: str = "roof-automated"
 
+    # -- Frontend --
+    frontend_url: str = "https://roof-automated.vercel.app"
+
     # -- AWS S3 --
     aws_access_key_id: str = ""
     aws_secret_access_key: str = ""

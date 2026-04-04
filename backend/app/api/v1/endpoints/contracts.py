@@ -36,6 +36,7 @@ class ContractResponse(BaseModel):
     status: str
     contract_amount: float
     sign_url: str | None = None
+    customer_page_url: str | None = None
 
 
 @router.post("/projects/{project_id}/generate-contract", response_model=ContractResponse)
@@ -63,6 +64,11 @@ async def generate_contract(
     # Build signing URL from the frontend origin
     frontend_url = request.headers.get("origin") or str(request.base_url).rstrip("/")
     sign_url = f"{frontend_url}/sign/{result['token']}"
+    customer_page_url = (
+        f"{frontend_url}/my-project/{result['customer_token']}"
+        if result.get("customer_token")
+        else None
+    )
 
     return ContractResponse(
         contract_id=result["contract_id"],
@@ -70,6 +76,7 @@ async def generate_contract(
         status=result["status"],
         contract_amount=result["contract_amount"],
         sign_url=sign_url,
+        customer_page_url=customer_page_url,
     )
 
 

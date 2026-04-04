@@ -6,6 +6,7 @@ from app.models.base import Base
 from app.models.company import Company
 from app.models.consent import SMSConsent
 from app.models.contract import Contract
+from app.models.review import CustomerReview
 from app.models.message import Message, MessageMedia
 from app.models.project import MilestoneTemplate, Project, ProjectMilestone
 from app.models.rate_card import (
@@ -35,4 +36,5 @@ __all__ = [
     "AuditLog",
     "ProjectEvent",
     "Contract",
+    "CustomerReview",
 ]

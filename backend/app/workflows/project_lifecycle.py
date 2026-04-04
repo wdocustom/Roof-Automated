@@ -209,6 +209,14 @@ async def run_payment_agent(
 
 
 @activity.defn
+async def check_and_complete_project(company_id: str, project_id: str) -> dict:
+    """Check if all milestones are approved; if so, complete the project."""
+    from app.services.completion_service import check_project_completion
+
+    return await check_project_completion(project_id=project_id, company_id=company_id)
+
+
+@activity.defn
 async def log_lifecycle_event(company_id: str, project_id: str, action: str, data: dict) -> None:
     """Log a lifecycle event to the audit trail."""
     from app.agents.events import Event, EventType, emit_event
@@ -387,23 +395,20 @@ class ProjectLifecycleWorkflow:
                         )
                         continue
 
-                # Milestone approved — trigger payment if applicable
+                # Milestone approved — check if project is now complete
                 if qc_result.get("qc_passed") or self._human_approvals.get(milestone_id):
-                    await workflow.execute_activity(
-                        run_payment_agent,
-                        args=[
-                            input.company_id,
-                            input.project_id,
-                            input.customer_phone,
-                            input.from_phone,
-                            {
-                                "event_type": "milestone_qc_passed",
-                                "data": {"milestone": milestone_id},
-                            },
-                        ],
+                    completion = await workflow.execute_activity(
+                        check_and_complete_project,
+                        args=[input.company_id, input.project_id],
                         start_to_close_timeout=timedelta(seconds=60),
                         retry_policy=workflow.RetryPolicy(maximum_attempts=3),
                     )
+
+                    if completion.get("completed"):
+                        # All milestones done — completion_service sent final invoice
+                        self._project_completed = True
+                        actions_log.append({"phase": "auto_completed", "result": completion})
+                        break
 
         # 3. Project completion — final payment + warranty
         payment_result = await workflow.execute_activity(

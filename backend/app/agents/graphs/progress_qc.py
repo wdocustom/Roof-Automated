@@ -214,14 +214,20 @@ async def assess_quality(state: QCState) -> dict:
 
 
 async def handle_qc_result(state: QCState) -> dict:
-    """Process the QC result — approve, request human review, or flag issues."""
+    """Process the QC result — approve, request human review, or flag issues.
+
+    When auto-approving, also marks the milestone as APPROVED in the DB
+    and checks if ALL milestones are now done (triggers project completion).
+    """
     recommendation = state.get("recommendation", "flag_for_review")
     requires_human = state.get("milestone_requires_human_signoff", False)
     events: list[dict] = []
     messages: list[dict] = []
 
     if recommendation == "approve" and not requires_human:
-        # Auto-approve — update milestone status
+        # Auto-approve — update milestone status in DB
+        await _approve_milestone(state["company_id"], state.get("milestone_id", ""))
+
         events.append(
             {
                 "type": EventType.MILESTONE_QC_PASSED.value,
@@ -229,6 +235,25 @@ async def handle_qc_result(state: QCState) -> dict:
                 "description": f"Milestone '{state.get('milestone_name', '')}' QC passed (auto-approved)",
             }
         )
+
+        # Check if ALL milestones are now approved → auto-complete project
+        from app.services.completion_service import check_project_completion
+
+        completion = await check_project_completion(
+            project_id=state["project_id"],
+            company_id=state["company_id"],
+        )
+        if completion.get("completed") and completion.get("customer_token"):
+            events.append(
+                {
+                    "type": EventType.JOB_COMPLETED.value,
+                    "data": {
+                        "customer_token": completion["customer_token"],
+                        "final_amount": completion.get("final_amount", 0),
+                    },
+                    "description": "All milestones approved — project completed, final invoice sent",
+                }
+            )
 
         # Notify customer
         if state.get("customer_phone"):
@@ -374,6 +399,29 @@ def _get_expected_work(milestone_name: str, project) -> str:
             return desc
 
     return f"Complete: {milestone_name}. Work should match contract specifications."
+
+
+async def _approve_milestone(company_id: str, milestone_id: str) -> None:
+    """Mark a milestone as APPROVED in the database."""
+    if not milestone_id:
+        return
+
+    from datetime import UTC, datetime
+
+    from sqlalchemy import select
+
+    from app.core.database import get_system_session
+    from app.models.project import MilestoneStatus, ProjectMilestone
+
+    async with get_system_session() as session:
+        result = await session.execute(
+            select(ProjectMilestone).where(ProjectMilestone.id == uuid.UUID(milestone_id))
+        )
+        milestone = result.scalar_one_or_none()
+        if milestone:
+            milestone.status = MilestoneStatus.APPROVED
+            milestone.approved_at = datetime.now(UTC).isoformat()
+            await session.flush()
 
 
 def _parse_response(content: str) -> dict:

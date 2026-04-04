@@ -106,78 +106,28 @@ async def create_milestone_invoice(
 
 def build_payment_schedule(
     contract_amount: float,
-    milestones: list[dict],
+    milestones: list[dict] | None = None,
 ) -> list[dict]:
     """Build a milestone-based payment schedule.
 
     Default split:
-      - 50% at contract signing (deposit)
-      - 40% at substantial completion (e.g., shingles installed)
-      - 10% at final walkthrough / approval
+      - 50% deposit at contract signing
+      - 50% upon completion / final walkthrough
 
-    Adjustable based on the number of milestones and company preferences.
+    Change orders are separate transactions assessed at time of change.
     """
-    if not milestones:
-        return [{"milestone": "full_payment", "percentage": 100, "amount": contract_amount}]
-
-    num_milestones = len(milestones)
-
-    if num_milestones == 1:
-        return [
-            {
-                "milestone": milestones[0].get("name", "Completion"),
-                "percentage": 100,
-                "amount": contract_amount,
-            }
-        ]
-
-    if num_milestones == 2:
-        return [
-            {
-                "milestone": milestones[0].get("name", "Phase 1"),
-                "percentage": 60,
-                "amount": round(contract_amount * 0.6, 2),
-            },
-            {
-                "milestone": milestones[1].get("name", "Final"),
-                "percentage": 40,
-                "amount": round(contract_amount * 0.4, 2),
-            },
-        ]
-
-    # 3+ milestones: deposit / progress / final
-    schedule = []
-    deposit_pct = 50
-    final_pct = 10
-    progress_pct = 100 - deposit_pct - final_pct
-    progress_per = progress_pct / max(num_milestones - 2, 1)
-
-    schedule.append(
+    return [
         {
-            "milestone": milestones[0].get("name", "Deposit"),
-            "percentage": deposit_pct,
-            "amount": round(contract_amount * deposit_pct / 100, 2),
-        }
-    )
-
-    for m in milestones[1:-1]:
-        schedule.append(
-            {
-                "milestone": m.get("name", "Progress"),
-                "percentage": round(progress_per, 1),
-                "amount": round(contract_amount * progress_per / 100, 2),
-            }
-        )
-
-    schedule.append(
+            "milestone": "Deposit (upon signing)",
+            "percentage": 50,
+            "amount": round(contract_amount * 0.5, 2),
+        },
         {
-            "milestone": milestones[-1].get("name", "Final"),
-            "percentage": final_pct,
-            "amount": round(contract_amount * final_pct / 100, 2),
-        }
-    )
-
-    return schedule
+            "milestone": "Final payment (upon completion)",
+            "percentage": 50,
+            "amount": round(contract_amount * 0.5, 2),
+        },
+    ]
 
 
 REMINDER_CADENCE = [

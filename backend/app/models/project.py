@@ -96,6 +96,9 @@ class Project(BaseModel, TenantMixin):
     contract_docusign_envelope_id: Mapped[str | None] = mapped_column(String(100))
     stripe_payment_intent_id: Mapped[str | None] = mapped_column(String(100))
 
+    # Customer-facing page token (permanent link)
+    customer_token: Mapped[str | None] = mapped_column(String(64), unique=True, index=True)
+
     # Source tracking
     lead_source: Mapped[str | None] = mapped_column(String(100))
 

@@ -28,6 +28,7 @@ from app.workflows.client import get_temporal_client
 # Phase 3: Project lifecycle + swarm agents
 from app.workflows.project_lifecycle import (
     ProjectLifecycleWorkflow,
+    check_and_complete_project,
     log_lifecycle_event,
     run_execution_agent,
     run_orchestrator,
@@ -90,6 +91,7 @@ async def run_worker() -> None:
             run_execution_agent,
             run_qc_agent,
             run_payment_agent,
+            check_and_complete_project,
             log_lifecycle_event,
         ],
         workflow_runner=sandbox_runner,

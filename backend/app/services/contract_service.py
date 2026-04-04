@@ -68,13 +68,8 @@ async def generate_contract(
             else:
                 raise ValueError("No contract amount or estimate available")
 
-        # Build payment schedule (50/40/10 split)
-        milestones = [
-            {"name": "Deposit (upon signing)"},
-            {"name": "Substantial completion"},
-            {"name": "Final walkthrough & approval"},
-        ]
-        schedule = build_payment_schedule(amount, milestones)
+        # Build payment schedule (50/50 split)
+        schedule = build_payment_schedule(amount)
         schedule_json = json.dumps(schedule)
 
         # Build contract HTML
@@ -114,16 +109,23 @@ async def generate_contract(
         session.add(contract)
         await session.flush()
 
-        # Update project
+        # Update project + generate customer page token
+        import secrets
+
         project.contract_amount = amount
         project.status = ProjectStatus.CONTRACT_SENT
+        if not project.customer_token:
+            project.customer_token = secrets.token_urlsafe(20)
         await session.flush()
+
+        customer_token = project.customer_token
 
         return {
             "contract_id": str(contract.id),
             "token": contract.token,
             "contract_amount": amount,
             "status": "draft",
+            "customer_token": customer_token,
         }
 
 
