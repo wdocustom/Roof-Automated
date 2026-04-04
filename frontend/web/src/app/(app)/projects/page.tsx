@@ -306,7 +306,7 @@ export default function ProjectsPage() {
       {/* New Project Modal */}
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] flex flex-col">
             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
               <h2 className="text-lg font-semibold text-gray-900">
                 New Project
@@ -319,7 +319,7 @@ export default function ProjectsPage() {
               </button>
             </div>
 
-            <form onSubmit={handleSubmit} className="px-6 py-5 space-y-5">
+            <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
               {error && (
                 <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">
                   {error}
@@ -470,8 +470,8 @@ export default function ProjectsPage() {
                 />
               </div>
 
-              {/* Actions */}
-              <div className="flex justify-end gap-3 pt-2">
+              {/* Actions — sticky footer so always visible on mobile */}
+              <div className="flex justify-end gap-3 sticky bottom-0 bg-white border-t border-gray-200 -mx-6 px-6 py-4 -mb-5 rounded-b-xl">
                 <button
                   type="button"
                   onClick={() => { setShowModal(false); resetForm(); }}
