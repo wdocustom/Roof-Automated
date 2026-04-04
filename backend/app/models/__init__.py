@@ -1,5 +1,6 @@
 """SQLAlchemy models for the Roof Automated platform."""
 
+from app.agents.events import ProjectEvent
 from app.models.audit import AuditLog
 from app.models.base import Base
 from app.models.company import Company
@@ -31,4 +32,5 @@ __all__ = [
     "RateCardVersion",
     "SMSConsent",
     "AuditLog",
+    "ProjectEvent",
 ]

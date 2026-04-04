@@ -179,6 +179,47 @@ export function fetchThread(phoneNumber: string) {
   );
 }
 
+// ── Onboarding ──────────────────────────────────────────────
+
+export interface OnboardingStatus {
+  has_company: boolean;
+  company_name: string | null;
+  company_id: string | null;
+}
+
+export interface OnboardingRequest {
+  company_name: string;
+  phone?: string;
+  email?: string;
+  address?: string;
+  city?: string;
+  state?: string;
+  zip_code?: string;
+  contractor_license_number?: string;
+  contractor_license_state?: string;
+  preferred_area_code?: string;
+  skip_twilio?: boolean;
+}
+
+export interface OnboardingResponse {
+  company_id: string;
+  company_name: string;
+  twilio_phone_number: string | null;
+  messaging_service_sid: string | null;
+  status: string;
+}
+
+export function fetchOnboardingStatus() {
+  return apiFetch<OnboardingStatus>("/onboarding/status");
+}
+
+export function completeOnboarding(data: OnboardingRequest) {
+  return apiFetch<OnboardingResponse>("/onboarding/complete", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
 // ── Settings ─────────────────────────────────────────────────
 
 export interface CompanySettings {

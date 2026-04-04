@@ -21,7 +21,7 @@ export default function SignUpPage() {
 
     try {
       await authClient.signUp.email({ name, email, password });
-      router.push("/dashboard");
+      router.push("/onboarding");
     } catch {
       setError("Something went wrong. Please try again.");
     } finally {
