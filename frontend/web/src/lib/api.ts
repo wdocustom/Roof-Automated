@@ -252,6 +252,7 @@ export interface GenerateContractResponse {
   token: string;
   status: string;
   contract_amount: number;
+  sign_url: string | null;
 }
 
 export function generateContract(projectId: string, contractAmount?: number) {

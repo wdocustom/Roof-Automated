@@ -41,10 +41,11 @@ class ContractResponse(BaseModel):
 @router.post("/projects/{project_id}/generate-contract", response_model=ContractResponse)
 async def generate_contract(
     project_id: uuid.UUID,
+    request: Request,
     data: GenerateContractRequest | None = None,
     company_id: str = Depends(get_company_id),
 ):
-    """Generate a contract for a project. Returns a signing token."""
+    """Generate a contract for a project. Returns the signing token and URL."""
     from app.services.contract_service import generate_contract as gen
 
     try:
@@ -59,11 +60,16 @@ async def generate_contract(
         logger.exception("Contract generation failed for project %s", project_id)
         raise HTTPException(status_code=500, detail=str(e))
 
+    # Build signing URL from the frontend origin
+    frontend_url = request.headers.get("origin") or str(request.base_url).rstrip("/")
+    sign_url = f"{frontend_url}/sign/{result['token']}"
+
     return ContractResponse(
         contract_id=result["contract_id"],
         token=result["token"],
         status=result["status"],
         contract_amount=result["contract_amount"],
+        sign_url=sign_url,
     )
 
 

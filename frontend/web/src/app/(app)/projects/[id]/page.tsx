@@ -112,6 +112,7 @@ export default function ProjectDetailPage() {
 
   // Contract state
   const [contractSent, setContractSent] = useState(false);
+  const [contractSignUrl, setContractSignUrl] = useState<string | null>(null);
 
   const { data: contracts } = useQuery({
     queryKey: ["contracts", id],
@@ -122,16 +123,23 @@ export default function ProjectDetailPage() {
 
   const contractMutation = useMutation({
     mutationFn: async () => {
-      // Generate contract, then send it
       const generated = await generateContract(id);
-      await sendContract(generated.contract_id);
+      // Try to send via SMS, but don't fail if Twilio is down
+      try {
+        await sendContract(generated.contract_id);
+        setContractSent(true);
+        setTimeout(() => setContractSent(false), 5000);
+      } catch {
+        // SMS failed (Twilio pending) — that's OK, we still have the link
+      }
       return generated;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["project", id] });
       queryClient.invalidateQueries({ queryKey: ["contracts", id] });
-      setContractSent(true);
-      setTimeout(() => setContractSent(false), 5000);
+      if (data.sign_url) {
+        setContractSignUrl(data.sign_url);
+      }
     },
   });
 
@@ -460,10 +468,34 @@ export default function ProjectDetailPage() {
               )}
 
               {contractSent && (
-                <p className="text-xs text-green-600 mb-2">Contract sent! Customer will receive an SMS with the signing link.</p>
+                <p className="text-xs text-green-600 mb-2">Contract sent via SMS!</p>
               )}
               {contractMutation.isError && (
-                <p className="text-xs text-red-600 mb-2">Failed to generate/send contract.</p>
+                <p className="text-xs text-red-600 mb-2">Failed to generate contract.</p>
+              )}
+
+              {/* Signing link — always show when available */}
+              {(contractSignUrl || latestContract?.token) && (
+                <div className="bg-indigo-50 rounded-lg p-3 mb-3">
+                  <p className="text-xs text-indigo-600 font-medium mb-1">Signing Link</p>
+                  <a
+                    href={contractSignUrl || `/sign/${latestContract?.token}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs text-indigo-700 underline break-all"
+                  >
+                    {contractSignUrl || `${window.location.origin}/sign/${latestContract?.token}`}
+                  </a>
+                  <button
+                    onClick={() => {
+                      const url = contractSignUrl || `${window.location.origin}/sign/${latestContract?.token}`;
+                      navigator.clipboard.writeText(url);
+                    }}
+                    className="mt-1 text-xs text-indigo-500 hover:text-indigo-700"
+                  >
+                    Copy link
+                  </button>
+                </div>
               )}
 
               {(!latestContract || latestContract.status !== "signed") && (
@@ -477,7 +509,7 @@ export default function ProjectDetailPage() {
                   ) : (
                     <FileSignature className="h-4 w-4" />
                   )}
-                  {latestContract ? "Resend Contract" : "Send Contract"}
+                  {latestContract ? "Resend Contract" : "Generate Contract"}
                 </button>
               )}
             </div>
