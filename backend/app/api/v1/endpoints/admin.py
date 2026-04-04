@@ -82,6 +82,26 @@ async def create_company(data: CompanyCreate):
         }
 
 
+@router.post("/companies/{company_id}/seed-rate-card")
+async def seed_company_rate_card(company_id: str):
+    """Seed (or re-seed) a company's rate card with industry defaults.
+
+    Uses the company's clerk_org_id as the tenant key.
+    """
+    async with get_system_session() as session:
+        result = await session.execute(
+            select(Company).where(Company.id == company_id)
+        )
+        company = result.scalar_one_or_none()
+        if not company:
+            raise HTTPException(status_code=404, detail="Company not found")
+
+    from app.services.seed_rate_card import seed_rate_card
+
+    counts = await seed_rate_card(company.clerk_org_id)
+    return {"company_id": company_id, "seeded": counts}
+
+
 @router.patch("/companies/{company_id}")
 async def update_company(company_id: str, data: CompanyUpdate):
     """Update a company's config (by UUID id)."""

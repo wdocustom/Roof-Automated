@@ -208,6 +208,61 @@ async def run_customer_engagement_agent(input: AgentDispatchInput, project_id: s
 
 
 @activity.defn
+async def notify_owner_escalation(
+    company_id: str,
+    agent_name: str,
+    customer_phone: str,
+    reason: str,
+    project_id: str,
+) -> None:
+    """Notify the company owner via SMS when an agent escalates to human review."""
+    from sqlalchemy import select
+
+    from app.core.database import get_tenant_session
+    from app.integrations.twilio.sms import send_sms
+    from app.models.company import Company
+
+    try:
+        async with get_tenant_session(company_id) as session:
+            result = await session.execute(
+                select(Company).where(Company.clerk_org_id == company_id)
+            )
+            company = result.scalar_one_or_none()
+
+        if not company or not company.phone:
+            logger.warning(
+                "escalation_no_owner_phone",
+                company_id=company_id,
+                reason=reason,
+            )
+            return
+
+        from_phone = company.twilio_phone_number
+        if not from_phone:
+            logger.warning("escalation_no_twilio_number", company_id=company_id)
+            return
+
+        msg = (
+            f"[Roof Automated] Action needed\n\n"
+            f"Agent '{agent_name}' flagged a conversation for your review.\n"
+            f"Customer: {customer_phone}\n"
+            f"Reason: {reason}\n"
+        )
+        if project_id:
+            msg += f"Project: {project_id}\n"
+
+        await send_sms(to=company.phone, from_=from_phone, body=msg)
+        logger.info(
+            "escalation_notified",
+            company_id=company_id,
+            owner_phone=company.phone,
+            reason=reason,
+        )
+    except Exception:
+        logger.exception("escalation_notification_failed", company_id=company_id)
+
+
+@activity.defn
 async def log_agent_action(
     company_id: str,
     agent_name: str,
@@ -288,7 +343,23 @@ class AgentDispatchWorkflow:
                 ),
             )
 
-        # 3. Log to audit trail
+        # 3. Notify owner if agent flagged for human review
+        if result.get("needs_human_review"):
+            await workflow.execute_activity(
+                notify_owner_escalation,
+                args=[
+                    input.company_id,
+                    result.get("agent_name", ""),
+                    input.customer_phone,
+                    result.get("metadata", {}).get("escalation_reason", "")
+                    or result.get("metadata", {}).get("human_review_reason", "")
+                    or "Agent requested human review",
+                    result.get("project_id", ""),
+                ],
+                start_to_close_timeout=timedelta(seconds=15),
+            )
+
+        # 4. Log to audit trail
         await workflow.execute_activity(
             log_agent_action,
             args=[

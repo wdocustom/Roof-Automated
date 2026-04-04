@@ -221,6 +221,20 @@ export interface ProjectCreateRequest {
   lead_source?: string;
 }
 
+export interface SendInvoiceResponse {
+  status: string;
+  payment_url: string;
+  amount: number;
+  twilio_sid: string;
+  customer_phone: string;
+}
+
+export function sendInvoice(projectId: string) {
+  return apiFetch<SendInvoiceResponse>(`/projects/${projectId}/send-invoice`, {
+    method: "POST",
+  });
+}
+
 export function createProject(data: ProjectCreateRequest) {
   return apiFetch<Project>("/projects", {
     method: "POST",

@@ -61,6 +61,23 @@ async def store_message(
             "to_phone": to_phone,
         }
 
+    # Auto-record implied consent (customer texted us first = opt-in)
+    try:
+        from app.services.consent_service import check_consent, record_opt_in
+        from app.models.consent import ConsentSource
+
+        consent = await check_consent(from_phone, company_id)
+        if consent["status"] == "no_record":
+            await record_opt_in(
+                phone=from_phone,
+                company_id=company_id,
+                source=ConsentSource.TEXT_KEYWORD,
+                consent_text="Implied consent: customer initiated SMS conversation",
+                customer_id=customer_id,
+            )
+    except Exception:
+        pass  # Don't block message storage if consent recording fails
+
     # Store the message under tenant context
     async with get_tenant_session(company_id) as session:
         message = Message(

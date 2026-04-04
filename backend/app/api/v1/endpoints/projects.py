@@ -152,6 +152,106 @@ async def get_project(
         )
 
 
+@router.post("/{project_id}/send-invoice")
+async def send_invoice(
+    project_id: uuid.UUID,
+    company_id: str = Depends(get_company_id),
+):
+    """Generate a Stripe payment link and send it to the customer via SMS.
+
+    Uses the project's contract_amount. Falls back to estimate_high if no contract.
+    """
+    from app.integrations.stripe.payments import create_payment_link
+    from app.integrations.twilio.sms import send_sms
+    from app.models.company import Company
+    from app.models.user import User
+
+    try:
+        async with get_tenant_session(company_id) as session:
+            result = await session.execute(
+                select(Project)
+                .options(selectinload(Project.customer))
+                .where(Project.id == project_id)
+            )
+            project = result.scalar_one_or_none()
+            if not project:
+                raise HTTPException(status_code=404, detail="Project not found")
+
+            amount = project.contract_amount or project.estimate_high
+            if not amount or amount <= 0:
+                raise HTTPException(
+                    status_code=400,
+                    detail="No contract amount or estimate set on this project",
+                )
+
+            customer = project.customer
+            if not customer or not customer.phone:
+                raise HTTPException(
+                    status_code=400,
+                    detail="No customer phone number on this project",
+                )
+
+            # Look up company for Twilio number and name
+            co_result = await session.execute(
+                select(Company).where(Company.clerk_org_id == company_id)
+            )
+            company_record = co_result.scalar_one_or_none()
+
+        company_name = company_record.name if company_record else "Your Contractor"
+        from_phone = company_record.twilio_phone_number if company_record else None
+
+        if not from_phone:
+            raise HTTPException(
+                status_code=400,
+                detail="No Twilio phone number configured",
+            )
+
+        # Create Stripe payment link
+        amount_cents = int(amount * 100)
+        payment_url = await create_payment_link(
+            amount_cents=amount_cents,
+            description=f"Roofing project at {project.property_address}",
+            customer_email=customer.email,
+            metadata={
+                "project_id": str(project_id),
+                "company_id": company_id,
+                "payment_type": "invoice",
+            },
+        )
+
+        # Send via SMS
+        customer_name = f"{customer.first_name or ''} {customer.last_name or ''}".strip() or "there"
+        sms_body = (
+            f"Hi {customer_name}, here's your invoice from {company_name} "
+            f"for ${amount:,.2f} for work at {project.property_address}.\n\n"
+            f"Pay securely here: {payment_url}\n\n"
+            f"Questions? Just reply to this text."
+        )
+
+        twilio_sid = await send_sms(to=customer.phone, from_=from_phone, body=sms_body)
+
+        # Update project status to invoiced
+        async with get_tenant_session(company_id) as session:
+            result = await session.execute(select(Project).where(Project.id == project_id))
+            proj = result.scalar_one()
+            proj.status = ProjectStatus.INVOICED
+            await session.flush()
+
+        return {
+            "status": "sent",
+            "payment_url": payment_url,
+            "amount": amount,
+            "twilio_sid": twilio_sid,
+            "customer_phone": customer.phone,
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("send_invoice failed for project %s", project_id)
+        raise HTTPException(status_code=500, detail=f"Failed to send invoice: {e}")
+
+
 @router.patch("/{project_id}", response_model=ProjectResponse)
 async def update_project(
     project_id: uuid.UUID,

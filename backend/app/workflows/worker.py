@@ -19,6 +19,7 @@ from app.workflows.agent_dispatch import (
     AgentDispatchWorkflow,
     determine_agent,
     log_agent_action,
+    notify_owner_escalation,
     run_customer_engagement_agent,
     run_lead_onboarding_agent,
 )
@@ -83,6 +84,7 @@ async def run_worker() -> None:
             run_lead_onboarding_agent,
             run_customer_engagement_agent,
             log_agent_action,
+            notify_owner_escalation,
             # Phase 3: Swarm agents
             run_orchestrator,
             run_execution_agent,

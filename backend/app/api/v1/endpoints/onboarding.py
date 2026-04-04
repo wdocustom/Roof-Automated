@@ -136,6 +136,17 @@ async def complete_onboarding(
         await session.flush()
         company_id = str(company.id)
 
+    # Seed rate card with industry defaults
+    try:
+        from app.services.seed_rate_card import seed_rate_card
+
+        seed_counts = await seed_rate_card(company_id)
+        logger.info(
+            "Rate card seeded for %s: %s", data.company_name, seed_counts
+        )
+    except Exception:
+        logger.exception("Rate card seeding failed for %s", data.company_name)
+
     status = "complete" if twilio_phone else "complete_no_twilio"
 
     return OnboardingResponse(
