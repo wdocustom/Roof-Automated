@@ -319,7 +319,7 @@ export default function ProjectsPage() {
               </button>
             </div>
 
-            <form id="new-project-form" onSubmit={handleSubmit} className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
+            <form id="new-project-form" onSubmit={handleSubmit} className="flex-1 min-h-0 overflow-y-auto px-6 py-5 space-y-5">
               {error && (
                 <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">
                   {error}
@@ -472,8 +472,8 @@ export default function ProjectsPage() {
 
             </form>
 
-            {/* Actions — pinned outside scroll area so always visible */}
-            <div className="flex justify-end gap-3 border-t border-gray-200 px-6 py-4">
+            {/* Actions — pinned footer, never scrolls */}
+            <div className="flex-shrink-0 flex justify-end gap-3 border-t border-gray-200 px-6 py-4">
               <button
                 type="button"
                 onClick={() => { setShowModal(false); resetForm(); }}
