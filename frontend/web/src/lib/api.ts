@@ -217,6 +217,7 @@ export interface ProjectCreateRequest {
   property_state: string;
   property_zip: string;
   project_type: string;
+  combo_details?: string[];
   description?: string;
   lead_source?: string;
 }
@@ -284,6 +285,10 @@ export function createProject(data: ProjectCreateRequest) {
     method: "POST",
     body: JSON.stringify(data),
   });
+}
+
+export function seedProject() {
+  return apiFetch<Project>("/projects/seed", { method: "POST" });
 }
 
 // ── Onboarding ──────────────────────────────────────────────

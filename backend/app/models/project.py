@@ -72,6 +72,7 @@ class Project(BaseModel, TenantMixin):
         nullable=False,
     )
     description: Mapped[str | None] = mapped_column(Text)
+    combo_details: Mapped[str | None] = mapped_column(Text)  # JSON: ["roof_replacement","gutters"]
 
     # Estimate & pricing
     estimated_sqft: Mapped[float | None] = mapped_column(Float)

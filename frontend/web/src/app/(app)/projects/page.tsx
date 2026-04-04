@@ -4,8 +4,8 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { clsx } from "clsx";
 import { formatDistanceToNow } from "date-fns";
-import { FolderKanban, MapPin, Plus, X } from "lucide-react";
-import { fetchProjects, createProject } from "@/lib/api";
+import { FolderKanban, MapPin, Plus, X, Sparkles } from "lucide-react";
+import { fetchProjects, createProject, seedProject } from "@/lib/api";
 import { useState } from "react";
 
 const statusColors: Record<string, string> = {
@@ -23,14 +23,14 @@ const statusColors: Record<string, string> = {
   cancelled: "bg-gray-100 text-gray-500",
 };
 
-const projectTypes = [
-  { value: "roof_replacement", label: "Roof Replacement" },
-  { value: "roof_repair", label: "Roof Repair" },
-  { value: "siding_install", label: "Siding Install" },
-  { value: "siding_repair", label: "Siding Repair" },
-  { value: "gutters", label: "Gutters" },
-  { value: "combo", label: "Combo (Roof + Siding)" },
-  { value: "other", label: "Other" },
+// Service options as clickable pills — multi-select for combo
+const SERVICE_OPTIONS = [
+  { value: "roof_replacement", label: "Roof Replacement", icon: "🏠" },
+  { value: "roof_repair", label: "Roof Repair", icon: "🔧" },
+  { value: "siding_install", label: "Siding Install", icon: "🧱" },
+  { value: "siding_repair", label: "Siding Repair", icon: "🪛" },
+  { value: "gutters", label: "Gutters", icon: "🌧️" },
+  { value: "other", label: "Other", icon: "📋" },
 ];
 
 const US_STATES = [
@@ -66,7 +66,7 @@ export default function ProjectsPage() {
   const [city, setCity] = useState("");
   const [state, setState] = useState("");
   const [zip, setZip] = useState("");
-  const [projectType, setProjectType] = useState("roof_replacement");
+  const [selectedServices, setSelectedServices] = useState<string[]>([]);
   const [description, setDescription] = useState("");
 
   const { data, isLoading } = useQuery({
@@ -86,6 +86,17 @@ export default function ProjectsPage() {
     },
   });
 
+  const seedMutation = useMutation({
+    mutationFn: seedProject,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["projects"] });
+    },
+    onError: () => {
+      setError("Failed to seed project.");
+      setTimeout(() => setError(""), 3000);
+    },
+  });
+
   function resetForm() {
     setCustomerName("");
     setCustomerPhone("");
@@ -94,14 +105,34 @@ export default function ProjectsPage() {
     setCity("");
     setState("");
     setZip("");
-    setProjectType("roof_replacement");
+    setSelectedServices([]);
     setDescription("");
     setError("");
+  }
+
+  function toggleService(value: string) {
+    setSelectedServices((prev) =>
+      prev.includes(value)
+        ? prev.filter((s) => s !== value)
+        : [...prev, value]
+    );
   }
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
+
+    if (selectedServices.length === 0) {
+      setError("Select at least one service.");
+      return;
+    }
+
+    // Determine project_type from selection
+    let projectType = selectedServices[0];
+    if (selectedServices.length > 1) {
+      projectType = "combo";
+    }
+
     mutation.mutate({
       customer_name: customerName,
       customer_phone: customerPhone || undefined,
@@ -111,6 +142,7 @@ export default function ProjectsPage() {
       property_state: state,
       property_zip: zip,
       project_type: projectType,
+      combo_details: selectedServices,
       description: description || undefined,
       lead_source: "manual",
     });
@@ -126,14 +158,30 @@ export default function ProjectsPage() {
             {data ? `${data.total} total projects` : "Loading..."}
           </p>
         </div>
-        <button
-          onClick={() => setShowModal(true)}
-          className="inline-flex items-center gap-2 rounded-lg bg-orange-600 px-4 py-2 text-sm font-medium text-white hover:bg-orange-700 transition-colors"
-        >
-          <Plus className="h-4 w-4" />
-          New Project
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => seedMutation.mutate()}
+            disabled={seedMutation.isPending}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50"
+          >
+            <Sparkles className="h-4 w-4" />
+            {seedMutation.isPending ? "Seeding..." : "Seed Demo"}
+          </button>
+          <button
+            onClick={() => setShowModal(true)}
+            className="inline-flex items-center gap-2 rounded-lg bg-orange-600 px-4 py-2 text-sm font-medium text-white hover:bg-orange-700 transition-colors"
+          >
+            <Plus className="h-4 w-4" />
+            New Project
+          </button>
+        </div>
       </div>
+
+      {error && !showModal && (
+        <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-sm text-red-700">
+          {error}
+        </div>
+      )}
 
       {/* Table */}
       <div className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
@@ -164,7 +212,7 @@ export default function ProjectsPage() {
             {isLoading ? (
               [...Array(5)].map((_, i) => (
                 <tr key={i}>
-                  {[...Array(5)].map((_, j) => (
+                  {[...Array(6)].map((_, j) => (
                     <td key={j} className="px-6 py-4">
                       <div className="h-4 bg-gray-100 animate-pulse rounded w-24" />
                     </td>
@@ -179,12 +227,22 @@ export default function ProjectsPage() {
                 >
                   <FolderKanban className="h-8 w-8 mx-auto text-gray-300 mb-2" />
                   <p>No projects yet.</p>
-                  <button
-                    onClick={() => setShowModal(true)}
-                    className="mt-2 text-sm text-orange-600 hover:text-orange-700 font-medium"
-                  >
-                    Create your first project
-                  </button>
+                  <div className="flex items-center justify-center gap-3 mt-3">
+                    <button
+                      onClick={() => setShowModal(true)}
+                      className="text-sm text-orange-600 hover:text-orange-700 font-medium"
+                    >
+                      Create your first project
+                    </button>
+                    <span className="text-gray-300">or</span>
+                    <button
+                      onClick={() => seedMutation.mutate()}
+                      disabled={seedMutation.isPending}
+                      className="text-sm text-indigo-600 hover:text-indigo-700 font-medium"
+                    >
+                      Seed a demo project
+                    </button>
+                  </div>
                 </td>
               </tr>
             ) : (
@@ -261,7 +319,7 @@ export default function ProjectsPage() {
               </button>
             </div>
 
-            <form onSubmit={handleSubmit} className="px-6 py-5 space-y-4">
+            <form onSubmit={handleSubmit} className="px-6 py-5 space-y-5">
               {error && (
                 <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">
                   {error}
@@ -339,26 +397,76 @@ export default function ProjectsPage() {
                 </div>
               </div>
 
-              {/* Project Details */}
+              {/* Services — clickable pills */}
               <div className="space-y-3">
-                <h3 className="text-sm font-medium text-gray-700">Project</h3>
-                <select
-                  value={projectType}
-                  onChange={(e) => setProjectType(e.target.value)}
-                  className="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500 bg-white"
-                >
-                  {projectTypes.map((t) => (
-                    <option key={t.value} value={t.value}>
-                      {t.label}
-                    </option>
-                  ))}
-                </select>
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-medium text-gray-700">Services</h3>
+                  {selectedServices.length > 1 && (
+                    <span className="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full font-medium">
+                      Combo Project
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-gray-500">
+                  Select one or more services — multiple selections create a combo project
+                </p>
+                <div className="grid grid-cols-2 gap-2">
+                  {SERVICE_OPTIONS.map((svc) => {
+                    const selected = selectedServices.includes(svc.value);
+                    return (
+                      <button
+                        key={svc.value}
+                        type="button"
+                        onClick={() => toggleService(svc.value)}
+                        className={clsx(
+                          "flex items-center gap-2 px-3 py-2.5 rounded-lg border-2 text-sm font-medium transition-all text-left",
+                          selected
+                            ? "border-orange-500 bg-orange-50 text-orange-700 ring-1 ring-orange-500/20"
+                            : "border-gray-200 bg-white text-gray-700 hover:border-gray-300 hover:bg-gray-50"
+                        )}
+                      >
+                        <span className="text-base">{svc.icon}</span>
+                        <span className="flex-1">{svc.label}</span>
+                        {selected && (
+                          <span className="text-orange-500 text-xs font-bold">+</span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+                {selectedServices.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5">
+                    {selectedServices.map((s) => {
+                      const svc = SERVICE_OPTIONS.find((o) => o.value === s);
+                      return (
+                        <span
+                          key={s}
+                          className="inline-flex items-center gap-1 bg-orange-100 text-orange-700 px-2.5 py-1 rounded-full text-xs font-medium"
+                        >
+                          {svc?.icon} {svc?.label}
+                          <button
+                            type="button"
+                            onClick={() => toggleService(s)}
+                            className="ml-0.5 hover:text-orange-900"
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        </span>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* Notes */}
+              <div className="space-y-3">
+                <h3 className="text-sm font-medium text-gray-700">Notes</h3>
                 <textarea
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
-                  placeholder="Notes (optional)"
+                  placeholder="Additional details (optional)"
                   rows={3}
-                  className="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500"
+                  className="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500 resize-none"
                 />
               </div>
 
@@ -373,7 +481,7 @@ export default function ProjectsPage() {
                 </button>
                 <button
                   type="submit"
-                  disabled={mutation.isPending}
+                  disabled={mutation.isPending || selectedServices.length === 0}
                   className="px-4 py-2 rounded-lg bg-orange-600 text-sm font-medium text-white hover:bg-orange-700 disabled:opacity-50 transition-colors"
                 >
                   {mutation.isPending ? "Creating..." : "Create Project"}

@@ -20,6 +20,7 @@ class ProjectCreate(BaseModel):
     property_state: str
     property_zip: str
     project_type: ProjectType
+    combo_details: list[str] | None = None  # ["roof_replacement", "gutters", "siding_install"]
     description: str | None = None
     lead_source: str | None = None
 
@@ -57,6 +58,7 @@ class ProjectResponse(BaseModel):
     project_type: ProjectType
     status: ProjectStatus
     description: str | None
+    combo_details: str | None = None
     estimated_sqft: float | None
     estimate_low: float | None
     estimate_high: float | None

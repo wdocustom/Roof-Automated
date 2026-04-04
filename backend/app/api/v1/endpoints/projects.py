@@ -10,7 +10,7 @@ from sqlalchemy.orm import selectinload
 
 from app.core.database import get_tenant_session
 from app.middleware.tenant import get_company_id
-from app.models.project import Project, ProjectStatus
+from app.models.project import Project, ProjectStatus, ProjectType
 from app.schemas.project import (
     ProjectCreate,
     ProjectListResponse,
@@ -105,6 +105,22 @@ async def create_project(
                     await session.flush()
                     customer_id = customer.id
 
+            # Auto-detect combo if multiple services selected
+            import json
+
+            project_type = data.project_type
+            combo_json = None
+            if data.combo_details and len(data.combo_details) > 1:
+                project_type = ProjectType.COMBO
+                combo_json = json.dumps(data.combo_details)
+            elif data.combo_details and len(data.combo_details) == 1:
+                # Single service selected — use it directly
+                try:
+                    project_type = ProjectType(data.combo_details[0])
+                except ValueError:
+                    pass
+                combo_json = json.dumps(data.combo_details)
+
             project = Project(
                 company_id=company_id,
                 customer_id=customer_id,
@@ -112,9 +128,10 @@ async def create_project(
                 property_city=data.property_city,
                 property_state=data.property_state,
                 property_zip=data.property_zip,
-                project_type=data.project_type,
+                project_type=project_type,
                 status=ProjectStatus.LEAD,
                 description=data.description,
+                combo_details=combo_json,
                 lead_source=data.lead_source or "manual",
             )
             session.add(project)
@@ -301,6 +318,58 @@ async def get_material_list(
         return await build_material_list(company_id, str(project_id))
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/seed", response_model=ProjectResponse, status_code=status.HTTP_201_CREATED)
+async def seed_project(
+    company_id: str = Depends(get_company_id),
+):
+    """Seed a demo project with realistic data for testing."""
+    import json
+
+    from app.models.user import User, UserRole
+
+    async with get_tenant_session(company_id) as session:
+        # Create demo customer
+        customer = User(
+            company_id=company_id,
+            clerk_user_id=f"seed-{uuid.uuid4().hex[:12]}",
+            first_name="Sarah",
+            last_name="Johnson",
+            phone="+14025551234",
+            email="sarah.johnson@example.com",
+            role=UserRole.CUSTOMER,
+        )
+        session.add(customer)
+        await session.flush()
+
+        project = Project(
+            company_id=company_id,
+            customer_id=customer.id,
+            property_address="4521 Maple Ridge Dr",
+            property_city="Omaha",
+            property_state="NE",
+            property_zip="68114",
+            project_type=ProjectType.COMBO,
+            status=ProjectStatus.ESTIMATED,
+            description=(
+                "Full roof replacement (architectural shingles, GAF Timberline HDZ in Charcoal) "
+                "and seamless aluminum gutter install (5-inch K-style, white). "
+                "Existing 3-tab shingles showing granule loss and curling on south-facing slope. "
+                "Gutters have multiple sag points and downspout disconnections. "
+                "2,400 sq ft roof, 180 linear ft gutters."
+            ),
+            combo_details=json.dumps(["roof_replacement", "gutters"]),
+            estimated_sqft=2400.0,
+            estimate_low=12800.0,
+            estimate_high=15200.0,
+            contract_amount=14000.0,
+            lead_source="seed",
+        )
+        session.add(project)
+        await session.flush()
+        await session.refresh(project)
+        return ProjectResponse.model_validate(project)
 
 
 @router.patch("/{project_id}", response_model=ProjectResponse)
