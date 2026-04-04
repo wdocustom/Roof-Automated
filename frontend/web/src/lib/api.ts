@@ -92,6 +92,14 @@ export function fetchCostTracking(days = 30) {
 
 // ── Projects ─────────────────────────────────────────────────
 
+export interface CustomerInfo {
+  id: string;
+  first_name: string | null;
+  last_name: string | null;
+  phone: string | null;
+  email: string | null;
+}
+
 export interface Project {
   id: string;
   company_id: string;
@@ -112,6 +120,7 @@ export interface Project {
   lead_source: string | null;
   created_at: string;
   updated_at: string;
+  customer: CustomerInfo | null;
 }
 
 export interface ProjectListResponse {

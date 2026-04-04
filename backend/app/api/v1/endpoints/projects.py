@@ -6,6 +6,7 @@ import uuid
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func, select
 from sqlalchemy.exc import DBAPIError, ProgrammingError
+from sqlalchemy.orm import selectinload
 
 from app.core.database import get_tenant_session
 from app.middleware.tenant import get_company_id
@@ -32,7 +33,7 @@ async def list_projects(
     """List projects for the current tenant with optional status filter."""
     try:
         async with get_tenant_session(company_id) as session:
-            query = select(Project)
+            query = select(Project).options(selectinload(Project.customer))
             count_query = select(func.count(Project.id))
 
             if status_filter:
@@ -136,7 +137,11 @@ async def get_project(
     """Get a single project by ID."""
     try:
         async with get_tenant_session(company_id) as session:
-            result = await session.execute(select(Project).where(Project.id == project_id))
+            result = await session.execute(
+                select(Project)
+                .options(selectinload(Project.customer))
+                .where(Project.id == project_id)
+            )
             project = result.scalar_one_or_none()
             if not project:
                 raise HTTPException(status_code=404, detail="Project not found")

@@ -144,6 +144,9 @@ export default function ProjectsPage() {
                 Property
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Customer
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Type
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -171,7 +174,7 @@ export default function ProjectsPage() {
             ) : data?.items.length === 0 ? (
               <tr>
                 <td
-                  colSpan={5}
+                  colSpan={6}
                   className="px-6 py-12 text-center text-gray-500"
                 >
                   <FolderKanban className="h-8 w-8 mx-auto text-gray-300 mb-2" />
@@ -201,6 +204,16 @@ export default function ProjectsPage() {
                       <MapPin className="h-3 w-3" />
                       {project.property_city}, {project.property_state}
                     </div>
+                  </td>
+                  <td className="px-6 py-4">
+                    <p className="text-sm font-medium text-gray-900">
+                      {project.customer
+                        ? `${project.customer.first_name || ""} ${project.customer.last_name || ""}`.trim() || "—"
+                        : "—"}
+                    </p>
+                    {project.customer?.phone && (
+                      <p className="text-xs text-gray-500">{project.customer.phone}</p>
+                    )}
                   </td>
                   <td className="px-6 py-4 text-sm text-gray-700">
                     {formatStatus(project.project_type)}

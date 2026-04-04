@@ -36,6 +36,16 @@ class ProjectUpdate(BaseModel):
     crew_lead_id: uuid.UUID | None = None
 
 
+class CustomerInfo(BaseModel):
+    id: uuid.UUID
+    first_name: str | None = None
+    last_name: str | None = None
+    phone: str | None = None
+    email: str | None = None
+
+    model_config = {"from_attributes": True}
+
+
 class ProjectResponse(BaseModel):
     id: uuid.UUID
     company_id: str
@@ -57,6 +67,7 @@ class ProjectResponse(BaseModel):
     lead_source: str | None
     created_at: datetime
     updated_at: datetime
+    customer: CustomerInfo | None = None
 
     model_config = {"from_attributes": True}
 
