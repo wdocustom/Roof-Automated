@@ -5,6 +5,7 @@ from fastapi import APIRouter
 from app.api.v1.endpoints import (
     admin,
     contracts,
+    crew_photos,
     dashboard,
     health,
     measurement_webhooks,
@@ -12,6 +13,7 @@ from app.api.v1.endpoints import (
     onboarding,
     photos,
     projects,
+    schedule,
     settings,
     stripe_webhooks,
     webhooks,
@@ -22,6 +24,8 @@ api_router = APIRouter()
 api_router.include_router(admin.router)
 api_router.include_router(onboarding.router)
 api_router.include_router(contracts.router)
+api_router.include_router(schedule.router)
+api_router.include_router(crew_photos.router)
 api_router.include_router(health.router)
 api_router.include_router(projects.router)
 api_router.include_router(photos.router)

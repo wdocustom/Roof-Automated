@@ -320,6 +320,51 @@ async def sign_contract(token: str, signer_name: str, signer_ip: str) -> dict:
     except Exception:
         logger.exception("Failed to send signing confirmation SMS")
 
+    # Auto-send deposit invoice (50% of contract amount)
+    try:
+        from app.integrations.stripe.payments import create_payment_link
+
+        deposit_amount = contract.contract_amount * 0.50
+        deposit_cents = int(deposit_amount * 100)
+
+        payment_url = await create_payment_link(
+            amount_cents=deposit_cents,
+            description=f"Deposit — Roofing project",
+            metadata={
+                "project_id": str(contract.project_id),
+                "company_id": company_id,
+                "payment_type": "deposit",
+                "milestone": "Deposit (upon signing)",
+            },
+        )
+
+        # Send deposit invoice to customer
+        async with get_system_session() as session:
+            result = await session.execute(
+                select(Contract)
+                .options(selectinload(Contract.customer))
+                .where(Contract.token == token)
+            )
+            c = result.scalar_one()
+            co_result = await session.execute(
+                select(Company).where(Company.clerk_org_id == company_id)
+            )
+            co = co_result.scalar_one_or_none()
+
+            if co and co.twilio_phone_number and c.customer and c.customer.phone:
+                await send_sms(
+                    to=c.customer.phone,
+                    from_=co.twilio_phone_number,
+                    body=(
+                        f"Your deposit of ${deposit_amount:,.2f} (50%) is due to begin work. "
+                        f"Pay securely here: {payment_url}\n\n"
+                        f"Questions? Reply to this text."
+                    ),
+                )
+                logger.info("deposit_invoice_sent", project_id=str(contract.project_id))
+    except Exception:
+        logger.exception("deposit_invoice_failed")
+
     return {
         "status": "signed",
         "signed_at": now.isoformat(),

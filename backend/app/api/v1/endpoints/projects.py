@@ -252,6 +252,57 @@ async def send_invoice(
         raise HTTPException(status_code=500, detail=f"Failed to send invoice: {e}")
 
 
+from pydantic import BaseModel as PydanticBaseModel
+
+
+class SupplierOrderRequest(PydanticBaseModel):
+    supplier_email: str
+    supplier_name: str = "Supplier"
+    preferred_delivery_date: str = ""
+    notes: str = ""
+
+
+@router.post("/{project_id}/order-materials")
+async def order_materials(
+    project_id: uuid.UUID,
+    data: SupplierOrderRequest,
+    company_id: str = Depends(get_company_id),
+):
+    """Build material list from project SOW and send order to supplier."""
+    from app.services.material_ordering import send_supplier_order_email
+
+    try:
+        result = await send_supplier_order_email(
+            company_id=company_id,
+            project_id=str(project_id),
+            supplier_email=data.supplier_email,
+            supplier_name=data.supplier_name,
+            preferred_delivery_date=data.preferred_delivery_date,
+            notes=data.notes,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.exception("Material order failed for project %s", project_id)
+        raise HTTPException(status_code=500, detail=str(e))
+
+    return result
+
+
+@router.get("/{project_id}/material-list")
+async def get_material_list(
+    project_id: uuid.UUID,
+    company_id: str = Depends(get_company_id),
+):
+    """Get the calculated material list for a project (no supplier contact)."""
+    from app.services.material_ordering import build_material_list
+
+    try:
+        return await build_material_list(company_id, str(project_id))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
 @router.patch("/{project_id}", response_model=ProjectResponse)
 async def update_project(
     project_id: uuid.UUID,

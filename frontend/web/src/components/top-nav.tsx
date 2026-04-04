@@ -11,6 +11,7 @@ import {
   Settings,
   HardHat,
   LogOut,
+  CalendarDays,
 } from "lucide-react";
 import { clsx } from "clsx";
 import { authClient } from "@/lib/auth/client";
@@ -18,6 +19,7 @@ import { authClient } from "@/lib/auth/client";
 const nav = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { name: "Projects", href: "/projects", icon: FolderKanban },
+  { name: "Schedule", href: "/schedule", icon: CalendarDays },
   { name: "Messages", href: "/messages", icon: MessageSquare },
   { name: "Payments", href: "/payments", icon: DollarSign },
   { name: "AI Agents", href: "/agents", icon: Bot },
