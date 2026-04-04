@@ -30,7 +30,9 @@ async def get_company_settings(
             if not company:
                 raise HTTPException(status_code=404, detail="Company not found")
             return CompanySettingsResponse.model_validate(company)
-    except (ProgrammingError, DBAPIError, HTTPException):
+    except HTTPException:
+        raise
+    except (ProgrammingError, DBAPIError):
         logger.warning("get_company_settings: tables not yet created — returning defaults")
         return CompanySettingsResponse(
             id="00000000-0000-0000-0000-000000000000",
