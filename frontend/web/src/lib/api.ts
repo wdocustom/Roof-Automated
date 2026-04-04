@@ -179,6 +179,46 @@ export function fetchThread(phoneNumber: string) {
   );
 }
 
+export interface SendMessageRequest {
+  to_phone: string;
+  body: string;
+}
+
+export interface SendMessageResult {
+  message_id: string;
+  twilio_sid: string;
+  status: string;
+}
+
+export function sendMessage(data: SendMessageRequest) {
+  return apiFetch<SendMessageResult>("/messages/send", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+// ── Projects (create) ───────────────────────────────────────
+
+export interface ProjectCreateRequest {
+  customer_name?: string;
+  customer_phone?: string;
+  customer_email?: string;
+  property_address: string;
+  property_city: string;
+  property_state: string;
+  property_zip: string;
+  project_type: string;
+  description?: string;
+  lead_source?: string;
+}
+
+export function createProject(data: ProjectCreateRequest) {
+  return apiFetch<Project>("/projects", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
 // ── Onboarding ──────────────────────────────────────────────
 
 export interface OnboardingStatus {

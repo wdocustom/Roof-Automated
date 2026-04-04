@@ -1,15 +1,15 @@
-"""Message thread endpoints — list conversations and view threads."""
+"""Message thread endpoints — list conversations, view threads, send SMS."""
 
 import logging
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy import func, select
 from sqlalchemy.exc import DBAPIError, ProgrammingError
 
 from app.core.database import get_tenant_session
 from app.middleware.tenant import get_company_id
-from app.models.message import Message
+from app.models.message import Message, MessageDirection, MessageSenderType
 from app.schemas.message import ConversationThread, MessageResponse
 
 logger = logging.getLogger(__name__)
@@ -112,3 +112,79 @@ async def get_conversation_thread(
             messages=[],
             total=0,
         )
+
+
+class SendMessageRequest(BaseModel):
+    to_phone: str
+    body: str
+
+
+class SendMessageResponse(BaseModel):
+    message_id: str
+    twilio_sid: str
+    status: str
+
+
+@router.post("/send", response_model=SendMessageResponse)
+async def send_outbound_message(
+    data: SendMessageRequest,
+    company_id: str = Depends(get_company_id),
+):
+    """Send an outbound SMS from the company's Twilio number.
+
+    Stores the message in the DB and sends via Twilio.
+    """
+    from app.integrations.twilio.sms import send_sms
+    from app.models.company import Company
+
+    # Look up company's Twilio number
+    async with get_tenant_session(company_id) as session:
+        result = await session.execute(
+            select(Company).where(Company.clerk_org_id == company_id)
+        )
+        company = result.scalar_one_or_none()
+
+    if not company:
+        raise HTTPException(status_code=404, detail="Company not found")
+
+    from_phone = company.twilio_phone_number
+    messaging_sid = company.twilio_messaging_service_sid
+
+    if not from_phone and not messaging_sid:
+        raise HTTPException(
+            status_code=400,
+            detail="No Twilio phone number configured. Add one in Settings.",
+        )
+
+    # Send via Twilio
+    try:
+        twilio_sid = await send_sms(
+            to=data.to_phone,
+            from_=from_phone,
+            body=data.body,
+        )
+    except Exception as e:
+        logger.exception("Failed to send SMS to %s", data.to_phone)
+        raise HTTPException(status_code=502, detail=f"SMS send failed: {e}")
+
+    # Store outbound message in DB
+    async with get_tenant_session(company_id) as session:
+        message = Message(
+            company_id=company_id,
+            from_phone=from_phone or "",
+            to_phone=data.to_phone,
+            direction=MessageDirection.OUTBOUND,
+            sender_type=MessageSenderType.OWNER,
+            body=data.body,
+            twilio_message_sid=twilio_sid,
+            twilio_status="sent",
+        )
+        session.add(message)
+        await session.flush()
+        message_id = str(message.id)
+
+    return SendMessageResponse(
+        message_id=message_id,
+        twilio_sid=twilio_sid,
+        status="sent",
+    )

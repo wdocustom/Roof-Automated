@@ -9,7 +9,12 @@ from app.models.project import ProjectStatus, ProjectType
 
 
 class ProjectCreate(BaseModel):
-    customer_id: uuid.UUID
+    # Either provide an existing customer_id, or provide contact info to create one
+    customer_id: uuid.UUID | None = None
+    customer_name: str | None = None
+    customer_phone: str | None = None
+    customer_email: str | None = None
+
     property_address: str
     property_city: str
     property_state: str

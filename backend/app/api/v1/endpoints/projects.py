@@ -61,12 +61,52 @@ async def create_project(
     data: ProjectCreate,
     company_id: str = Depends(get_company_id),
 ):
-    """Create a new project (job)."""
+    """Create a new project (job).
+
+    If customer_id is not provided but customer_name/phone/email are,
+    the customer (User) record is created automatically.
+    """
+    from app.models.user import User, UserRole
+
     try:
         async with get_tenant_session(company_id) as session:
+            customer_id = data.customer_id
+
+            # Auto-create customer if needed
+            if not customer_id:
+                if not data.customer_name:
+                    raise HTTPException(
+                        status_code=400,
+                        detail="Provide either customer_id or customer_name",
+                    )
+
+                # Check for existing customer by phone
+                if data.customer_phone:
+                    result = await session.execute(
+                        select(User).where(User.phone == data.customer_phone)
+                    )
+                    existing = result.scalar_one_or_none()
+                    if existing:
+                        customer_id = existing.id
+
+                if not customer_id:
+                    name_parts = data.customer_name.strip().split(" ", 1)
+                    customer = User(
+                        company_id=company_id,
+                        clerk_user_id=f"manual-{uuid.uuid4().hex[:12]}",
+                        first_name=name_parts[0],
+                        last_name=name_parts[1] if len(name_parts) > 1 else "",
+                        phone=data.customer_phone,
+                        email=data.customer_email,
+                        role=UserRole.CUSTOMER,
+                    )
+                    session.add(customer)
+                    await session.flush()
+                    customer_id = customer.id
+
             project = Project(
                 company_id=company_id,
-                customer_id=data.customer_id,
+                customer_id=customer_id,
                 property_address=data.property_address,
                 property_city=data.property_city,
                 property_state=data.property_state,
@@ -74,12 +114,14 @@ async def create_project(
                 project_type=data.project_type,
                 status=ProjectStatus.LEAD,
                 description=data.description,
-                lead_source=data.lead_source,
+                lead_source=data.lead_source or "manual",
             )
             session.add(project)
             await session.flush()
             await session.refresh(project)
             return ProjectResponse.model_validate(project)
+    except HTTPException:
+        raise
     except (ProgrammingError, DBAPIError):
         raise HTTPException(
             status_code=503, detail="Database tables not yet initialized"
