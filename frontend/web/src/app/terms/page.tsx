@@ -1,0 +1,159 @@
+import { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Terms and Conditions | Roof Automated",
+};
+
+export default function TermsPage() {
+  return (
+    <main className="max-w-3xl mx-auto px-6 py-12 text-gray-800">
+      <h1 className="text-3xl font-bold mb-2">Terms and Conditions</h1>
+      <p className="text-sm text-gray-500 mb-8">Last updated: April 4, 2026</p>
+
+      <section className="space-y-6 text-sm leading-relaxed">
+        <div>
+          <h2 className="text-lg font-semibold mb-2">1. Program Name</h2>
+          <p>Roof Automated SMS Messaging Service</p>
+        </div>
+
+        <div>
+          <h2 className="text-lg font-semibold mb-2">2. Program Description</h2>
+          <p>
+            Roof Automated provides an AI-powered communication platform that connects
+            roofing and siding contractors with their customers via SMS and MMS
+            messaging. By participating in this program, you will receive text messages
+            related to your roofing or siding project, including but not limited to:
+          </p>
+          <ul className="list-disc pl-6 space-y-1 mt-2">
+            <li>Responses to your project inquiries</li>
+            <li>Preliminary estimates and quotes</li>
+            <li>Appointment and scheduling confirmations</li>
+            <li>Project status updates and progress photos</li>
+            <li>Payment links and invoice notifications</li>
+            <li>Quality check results</li>
+          </ul>
+        </div>
+
+        <div>
+          <h2 className="text-lg font-semibold mb-2">3. Message Frequency</h2>
+          <p>
+            Message frequency varies based on your project activity and communication
+            needs. You may receive multiple messages per day during active project
+            phases (e.g., scheduling, inspections, active work). Message volume
+            decreases after project completion.
+          </p>
+        </div>
+
+        <div>
+          <h2 className="text-lg font-semibold mb-2">4. Message and Data Rates</h2>
+          <p>
+            Message and data rates may apply. Please check with your mobile carrier for
+            details about your messaging plan. Roof Automated does not charge for SMS
+            messages, but your carrier may apply standard messaging fees.
+          </p>
+        </div>
+
+        <div>
+          <h2 className="text-lg font-semibold mb-2">5. Opt-In and Consent</h2>
+          <p>
+            By sending an SMS or MMS message to a contractor&apos;s phone number powered
+            by Roof Automated, you consent to receive automated reply messages related
+            to your inquiry. You may also opt in by:
+          </p>
+          <ul className="list-disc pl-6 space-y-1 mt-2">
+            <li>Texting <strong>START</strong> to the contractor&apos;s number</li>
+            <li>
+              Submitting your phone number through a web form on the contractor&apos;s
+              website with an express consent checkbox
+            </li>
+          </ul>
+          <p className="mt-2">
+            Consent is not a condition of purchase. You can receive services from your
+            contractor without opting in to SMS messaging.
+          </p>
+        </div>
+
+        <div>
+          <h2 className="text-lg font-semibold mb-2">6. Opt-Out Instructions</h2>
+          <p>
+            You can opt out of receiving messages at any time by replying{" "}
+            <strong>STOP</strong> to any message you receive. You will receive a one-time
+            confirmation message and no further messages will be sent. To resume
+            messages, text <strong>START</strong>.
+          </p>
+        </div>
+
+        <div>
+          <h2 className="text-lg font-semibold mb-2">7. Support and Help</h2>
+          <p>
+            For help, reply <strong>HELP</strong> to any message or contact your roofing
+            contractor directly. You may also reach Roof Automated support at
+            support@roofautomated.com.
+          </p>
+        </div>
+
+        <div>
+          <h2 className="text-lg font-semibold mb-2">8. Supported Carriers</h2>
+          <p>
+            Our messaging service is compatible with all major US carriers, including
+            AT&amp;T, Verizon, T-Mobile, Sprint, and most regional carriers.
+          </p>
+        </div>
+
+        <div>
+          <h2 className="text-lg font-semibold mb-2">9. Privacy</h2>
+          <p>
+            Your privacy is important to us. Please review our{" "}
+            <a href="/privacy" className="text-orange-600 underline">
+              Privacy Policy
+            </a>{" "}
+            for details on how we collect, use, and protect your personal information.
+            We do not sell or share your information with third parties for marketing
+            purposes.
+          </p>
+        </div>
+
+        <div>
+          <h2 className="text-lg font-semibold mb-2">10. AI-Generated Content</h2>
+          <p>
+            Some messages may be generated by artificial intelligence. AI-generated
+            estimates are preliminary and not binding. Final pricing, scope of work, and
+            contracts are subject to human review and approval by your contractor.
+          </p>
+        </div>
+
+        <div>
+          <h2 className="text-lg font-semibold mb-2">11. Limitation of Liability</h2>
+          <p>
+            Roof Automated provides a communication platform between contractors and
+            customers. We are not a roofing or siding contractor and do not perform
+            construction work. All estimates, contracts, and work are provided by the
+            individual contractor. Roof Automated is not liable for the quality,
+            timeliness, or outcome of any construction project.
+          </p>
+        </div>
+
+        <div>
+          <h2 className="text-lg font-semibold mb-2">12. Changes to Terms</h2>
+          <p>
+            We reserve the right to update these Terms and Conditions at any time. Any
+            material changes will be posted on this page with a revised date. Continued
+            participation in the SMS program after changes are posted constitutes
+            acceptance of the updated terms.
+          </p>
+        </div>
+
+        <div>
+          <h2 className="text-lg font-semibold mb-2">13. Contact Information</h2>
+          <p>
+            <strong>Roof Automated</strong>
+            <br />
+            Email: support@roofautomated.com
+            <br />
+            Website: roof-automated.vercel.app
+          </p>
+        </div>
+      </section>
+    </main>
+  );
+}
