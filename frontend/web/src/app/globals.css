@@ -1,5 +1,16 @@
 @import "tailwindcss";
 
+/*
+ * Fix: Tailwind v4 preflight sets background-color: transparent on <button>,
+ * which can override utility classes like bg-orange-600 when layer ordering
+ * doesn't resolve correctly. Reset it so utilities always win.
+ */
+@layer base {
+  button {
+    background-color: unset;
+  }
+}
+
 :root {
   --background: #ffffff;
   --foreground: #171717;
