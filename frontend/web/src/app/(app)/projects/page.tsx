@@ -169,7 +169,7 @@ export default function ProjectsPage() {
           </button>
           <button
             onClick={() => setShowModal(true)}
-            className="inline-flex items-center gap-2 rounded-lg bg-orange-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-orange-700 transition-colors"
+            className="btn-orange inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium shadow-sm transition-colors"
           >
             <Plus className="h-4 w-4" />
             New Project
@@ -485,7 +485,7 @@ export default function ProjectsPage() {
                 type="submit"
                 form="new-project-form"
                 disabled={mutation.isPending || selectedServices.length === 0}
-                className="px-4 py-2 rounded-lg bg-orange-600 text-sm font-medium text-white hover:bg-orange-700 disabled:opacity-50 transition-colors"
+                className="btn-orange px-4 py-2 rounded-lg text-sm font-medium transition-colors"
               >
                 {mutation.isPending ? "Creating..." : "Create Project"}
               </button>

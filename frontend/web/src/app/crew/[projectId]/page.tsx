@@ -282,10 +282,9 @@ export default function CrewPhotoPage({ params }: { params: { projectId: string 
                     <button
                       onClick={() => handlePhotoCapture(milestone.id)}
                       disabled={uploading === milestone.id}
-                      className="ml-9 w-[calc(100%-2.25rem)] bg-orange-600 text-white py-3 rounded-xl
+                      className="btn-orange ml-9 w-[calc(100%-2.25rem)] py-3 rounded-xl
                         text-sm font-semibold flex items-center justify-center gap-2
-                        hover:bg-orange-700 active:scale-[0.98] disabled:opacity-50
-                        transition-all"
+                        active:scale-[0.98] transition-all"
                     >
                       {uploading === milestone.id ? (
                         <Loader2 className="h-5 w-5 animate-spin" />

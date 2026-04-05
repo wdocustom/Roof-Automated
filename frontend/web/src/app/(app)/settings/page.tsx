@@ -63,7 +63,7 @@ export default function SettingsPage() {
             "inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white transition-colors",
             mutation.isPending
               ? "bg-gray-400 cursor-not-allowed"
-              : "bg-orange-600 hover:bg-orange-700"
+              : "btn-orange"
           )}
         >
           <Save className="h-4 w-4" />

@@ -117,7 +117,7 @@ export default function OnboardingPage() {
           </p>
           <button
             onClick={() => router.push("/dashboard")}
-            className="w-full rounded-lg bg-orange-600 px-4 py-3 text-sm font-medium text-white hover:bg-orange-700 transition-colors"
+            className="btn-orange w-full rounded-lg px-4 py-3 text-sm font-medium transition-colors"
           >
             Go to Dashboard
           </button>
@@ -293,7 +293,7 @@ export default function OnboardingPage() {
           <button
             type="submit"
             disabled={loading || !companyName}
-            className="w-full rounded-lg bg-orange-600 px-4 py-3 text-sm font-semibold text-white hover:bg-orange-700 disabled:opacity-50 transition-colors"
+            className="btn-orange w-full rounded-lg px-4 py-3 text-sm font-semibold transition-colors"
           >
             Create Company & Get Phone Number
           </button>

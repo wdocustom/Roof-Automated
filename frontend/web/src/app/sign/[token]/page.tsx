@@ -279,8 +279,8 @@ export default function ContractSigningPage({ params }: { params: { token: strin
           <button
             onClick={handleSign}
             disabled={!signerName.trim() || !agreed || signing}
-            className="w-full bg-orange-600 text-white py-4 rounded-xl text-base font-semibold
-              hover:bg-orange-700 disabled:opacity-40 disabled:cursor-not-allowed
+            className="btn-orange w-full py-4 rounded-xl text-base font-semibold
+              disabled:opacity-40 disabled:cursor-not-allowed
               transition-colors active:scale-[0.98]"
           >
             {signing ? "Signing..." : "Sign Contract"}

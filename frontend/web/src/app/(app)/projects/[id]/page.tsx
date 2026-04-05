@@ -223,12 +223,12 @@ export default function ProjectDetailPage() {
         </div>
         <div>
           {!editing ? (
-            <button onClick={startEditing} className="inline-flex items-center gap-2 rounded-lg bg-orange-600 px-4 py-2 text-sm font-medium text-white hover:bg-orange-700 transition-colors">
+            <button onClick={startEditing} className="btn-orange inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors">
               <Pencil className="h-4 w-4" /> Edit
             </button>
           ) : (
             <div className="flex items-center gap-2">
-              <button onClick={handleSave} disabled={mutation.isPending} className="inline-flex items-center gap-2 rounded-lg bg-orange-600 px-4 py-2 text-sm font-medium text-white hover:bg-orange-700 transition-colors">
+              <button onClick={handleSave} disabled={mutation.isPending} className="btn-orange inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors">
                 <Save className="h-4 w-4" /> {mutation.isPending ? "Saving..." : "Save"}
               </button>
               <button onClick={() => { setEditing(false); setEditData({}); }} className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
@@ -410,7 +410,7 @@ export default function ProjectDetailPage() {
                 <button
                   type="submit"
                   disabled={!quickMsg.trim() || smsMutation.isPending}
-                  className="w-full inline-flex items-center justify-center gap-2 rounded-lg bg-orange-600 px-3 py-2 text-sm font-medium text-white hover:bg-orange-700 disabled:opacity-50 transition-colors"
+                  className="btn-orange w-full inline-flex items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors"
                 >
                   {smsMutation.isPending ? (
                     <Loader2 className="h-4 w-4 animate-spin" />

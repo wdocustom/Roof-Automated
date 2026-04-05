@@ -120,7 +120,7 @@ export default function MessagesPage() {
               />
               <button
                 type="submit"
-                className="px-3 py-1.5 rounded-lg bg-orange-600 text-white text-sm font-medium hover:bg-orange-700"
+                className="btn-orange px-3 py-1.5 rounded-lg text-sm font-medium"
               >
                 Go
               </button>
@@ -337,7 +337,7 @@ export default function MessagesPage() {
                 <button
                   type="submit"
                   disabled={!composeText.trim() || sendMutation.isPending}
-                  className="h-9 w-9 rounded-lg bg-orange-600 flex items-center justify-center text-white hover:bg-orange-700 disabled:opacity-50 transition-colors flex-shrink-0"
+                  className="btn-orange h-9 w-9 rounded-lg flex items-center justify-center transition-colors flex-shrink-0"
                 >
                   {sendMutation.isPending ? (
                     <Loader2 className="h-4 w-4 animate-spin" />

@@ -620,9 +620,8 @@ export default function CustomerProjectPage({ params }: { params: { token: strin
               <button
                 onClick={handlePay}
                 disabled={loadingPayment}
-                className="w-full bg-orange-600 text-white py-3.5 rounded-xl text-base font-semibold
-                  hover:bg-orange-700 disabled:opacity-50 transition-colors
-                  flex items-center justify-center gap-2"
+                className="btn-orange w-full py-3.5 rounded-xl text-base font-semibold
+                  transition-colors flex items-center justify-center gap-2"
               >
                 {loadingPayment ? (
                   <Loader2 className="h-5 w-5 animate-spin" />
@@ -758,8 +757,7 @@ export default function CustomerProjectPage({ params }: { params: { token: strin
                 <button
                   type="submit"
                   disabled={rating === 0 || submittingReview}
-                  className="w-full bg-orange-600 text-white py-3 rounded-xl text-sm font-semibold
-                    hover:bg-orange-700 disabled:opacity-50 transition-colors"
+                  className="btn-orange w-full py-3 rounded-xl text-sm font-semibold transition-colors"
                 >
                   {submittingReview ? "Submitting..." : "Submit Review"}
                 </button>
