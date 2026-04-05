@@ -169,7 +169,8 @@ export default function ProjectsPage() {
           </button>
           <button
             onClick={() => setShowModal(true)}
-            className="inline-flex items-center gap-2 rounded-lg bg-orange-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-orange-700 transition-colors"
+            style={{ backgroundColor: '#ea580c', color: '#ffffff' }}
+            className="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium shadow-sm hover:opacity-90 transition-colors"
           >
             <Plus className="h-4 w-4" />
             New Project
